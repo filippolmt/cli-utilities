@@ -1,0 +1,2437 @@
+{
+  "api_name": "changedetection",
+  "base_url": "http://localhost:5000/api/v1",
+  "description": "Every changedetection.io watch, tag, and notification from one CLI — plus offline cross-watch queries the web UI can't do.",
+  "mcp_ready": "full",
+  "http_transport": "standard",
+  "auth": {
+    "type": "api_key",
+    "header": "x-api-key",
+    "in": "header",
+    "env_vars": [
+      "CHANGEDETECTION_API_KEY",
+      "CHANGEDETECTION_IO_API_KEY"
+    ],
+    "env_var_specs": [
+      {
+        "name": "CHANGEDETECTION_API_KEY",
+        "kind": "per_call",
+        "required": false,
+        "sensitive": true
+      },
+      {
+        "name": "CHANGEDETECTION_IO_API_KEY",
+        "kind": "per_call",
+        "required": false,
+        "sensitive": true
+      }
+    ]
+  },
+  "required_headers": [],
+  "tools": [
+    {
+      "name": "bulk_import_import-watches",
+      "description": "Import a list of URLs to monitor with optional watch configuration. Accepts line-separated URLs in request body. **Configuration via Query Parameters:** You can pass ANY watch configuration field as query parameters to apply settings to all imported watches. All parameters from the Watch schema are supported (processor, fetch_backend, notification_urls, etc.). **Special Parameters:** - `tag` / `tag_uuids` - Assign tags to imported watches - `proxy` - Use specific proxy for imported watches - `dedupe` - Skip duplicate URLs (default: true) **Type Conversion:** - Booleans: `true`, `false`, `1`, `0`, `yes`, `no` - Arrays: Comma-separated or JSON format (`[item1,item2]`) - Objects: JSON format (`{'key':'value'}`) - Numbers: Parsed as int or float. Optional: tag_uuids, tag, proxy (plus 1 more). Returns array of string.",
+      "method": "POST",
+      "path": "/import",
+      "params": [
+        {
+          "name": "tag_uuids",
+          "type": "string",
+          "location": "query",
+          "description": "Tag UUID(s) to apply to imported watches (comma-separated for multiple)"
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "location": "query",
+          "description": "Tag name to apply to imported watches"
+        },
+        {
+          "name": "proxy",
+          "type": "string",
+          "location": "query",
+          "description": "Proxy key to use for imported watches"
+        },
+        {
+          "name": "dedupe",
+          "type": "bool",
+          "location": "query",
+          "description": "Skip duplicate URLs (default true)"
+        }
+      ]
+    },
+    {
+      "name": "find_search-watches",
+      "description": "Search web page change monitors (watches) by URL or title text. Required: q. Optional: tag, partial. Returns the SearchResult.",
+      "method": "GET",
+      "path": "/search",
+      "params": [
+        {
+          "name": "q",
+          "type": "string",
+          "location": "query",
+          "description": "Search query to match against watch URLs and titles",
+          "required": true
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "location": "query",
+          "description": "Tag name to limit results (name not UUID)"
+        },
+        {
+          "name": "partial",
+          "type": "string",
+          "location": "query",
+          "description": "Allow partial matching of URL query"
+        }
+      ]
+    },
+    {
+      "name": "full-spec_get-full-api-spec",
+      "description": "Return the fully merged OpenAPI specification for this instance. Unlike the static `api-spec.yaml` shipped with the application, this endpoint returns the spec dynamically merged with any `api.yaml` schemas provided by installed processor plugins. **Use this URL** with Swagger UI or Redoc to get schema-accurate documentation for your specific install — it includes every `processor_config_\u003cname\u003e` schema block contributed by installed processors (e.g. `processor_config_restock_diff` from the built-in restock plugin). This endpoint requires no authentication and returns YAML. To load it directly in Swagger UI, paste the URL into the 'Explore' box: ``` http://localhost:5000/api/v1/full-spec ```. (public)",
+      "method": "GET",
+      "path": "/full-spec",
+      "no_auth": true,
+      "params": [],
+      "header_overrides": [
+        {
+          "name": "Accept",
+          "value": "application/yaml"
+        }
+      ]
+    },
+    {
+      "name": "notifications_add",
+      "description": "Add one or more notification URLs to the configuration. Required: notification_urls. Returns array of string.",
+      "method": "POST",
+      "path": "/notifications",
+      "params": [
+        {
+          "name": "notification_urls",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "List of notification URLs",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "notifications_delete",
+      "description": "Delete one or more notification URLs from the configuration. Required: notification_urls. Destructive.",
+      "method": "DELETE",
+      "path": "/notifications",
+      "params": [
+        {
+          "name": "notification_urls",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "List of notification URLs",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "notifications_get",
+      "description": "Return the notification URL list from the configuration. Returns array of string.",
+      "method": "GET",
+      "path": "/notifications",
+      "params": []
+    },
+    {
+      "name": "notifications_replace",
+      "description": "Replace all notification URLs with the provided list (can be empty). Required: notification_urls. Returns array of string.",
+      "method": "PUT",
+      "path": "/notifications",
+      "params": [
+        {
+          "name": "notification_urls",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "List of notification URLs",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "systeminfo_get-system-info",
+      "description": "Return information about the current system state. Returns the SystemInfo.",
+      "method": "GET",
+      "path": "/systeminfo",
+      "params": []
+    },
+    {
+      "name": "tag_create",
+      "description": "Create a single tag/group. Required: title. Optional: body, browser_steps, check_unique_lines (default: false) (plus 57 more). Returns the new TagCreateResponse.",
+      "method": "POST",
+      "path": "/tag",
+      "params": [
+        {
+          "name": "body",
+          "type": "string",
+          "location": "body",
+          "description": "HTTP request body"
+        },
+        {
+          "name": "browser_steps",
+          "type": "array",
+          "location": "body",
+          "description": "Browser automation steps. Maximum 100 steps allowed."
+        },
+        {
+          "name": "check_unique_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Compare against all history for unique lines"
+        },
+        {
+          "name": "conditions",
+          "type": "array",
+          "location": "body",
+          "description": "Array of condition rules for change detection logic (empty array when not set)"
+        },
+        {
+          "name": "conditions_match_logic",
+          "type": "string",
+          "location": "body",
+          "description": "Logic operator - ALL (match all conditions) or ANY (match any condition)"
+        },
+        {
+          "name": "date_created",
+          "type": "int",
+          "location": "body",
+          "description": "Unix timestamp of creation"
+        },
+        {
+          "name": "extract_lines_containing",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Keep only lines containing these substrings (plain text, case-insensitive) — simpler..."
+        },
+        {
+          "name": "extract_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Regex patterns to extract specific text after filtering"
+        },
+        {
+          "name": "fetch_backend",
+          "type": "string",
+          "location": "body",
+          "description": "Backend to use for fetching content."
+        },
+        {
+          "name": "filter_failure_notification_send",
+          "type": "bool",
+          "location": "body",
+          "description": "Send notification when filters fail to match content"
+        },
+        {
+          "name": "filter_text_added",
+          "type": "bool",
+          "location": "body",
+          "description": "Include added text in change detection"
+        },
+        {
+          "name": "filter_text_removed",
+          "type": "bool",
+          "location": "body",
+          "description": "Include removed text in change detection"
+        },
+        {
+          "name": "filter_text_replaced",
+          "type": "bool",
+          "location": "body",
+          "description": "Include replaced text in change detection"
+        },
+        {
+          "name": "follow_price_changes",
+          "type": "bool",
+          "location": "body",
+          "description": "Monitor and track price changes (restock_diff processor)"
+        },
+        {
+          "name": "has_ldjson_price_data",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether page has LD-JSON price data (auto-detected)"
+        },
+        {
+          "name": "headers",
+          "type": "object",
+          "location": "body",
+          "description": "HTTP headers to include in requests"
+        },
+        {
+          "name": "history_snapshot_max_length",
+          "type": "int",
+          "location": "body",
+          "description": "Maximum number of history snapshots to keep (null = use system default)"
+        },
+        {
+          "name": "ignore_status_codes",
+          "type": "bool",
+          "location": "body",
+          "description": "Ignore HTTP status code errors (boolean or null)"
+        },
+        {
+          "name": "ignore_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text patterns to ignore in change detection"
+        },
+        {
+          "name": "in_stock_only",
+          "type": "bool",
+          "location": "body",
+          "description": "Only trigger on in-stock transitions (restock_diff processor)"
+        },
+        {
+          "name": "include_filters",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "CSS/XPath selectors to extract specific content from the page"
+        },
+        {
+          "name": "llm_change_summary",
+          "type": "string",
+          "location": "body",
+          "description": "Instructions for the AI to summarise changes in notifications."
+        },
+        {
+          "name": "llm_evaluation_cache",
+          "type": "object",
+          "location": "body",
+          "description": "Internal cache of AI evaluation results keyed by (intent, diff) hash (auto-managed)."
+        },
+        {
+          "name": "llm_intent",
+          "type": "string",
+          "location": "body",
+          "description": "Plain-English intent for AI-based change filtering."
+        },
+        {
+          "name": "llm_last_tokens_used",
+          "type": "int",
+          "location": "body",
+          "description": "Number of tokens consumed by the AI on the most recent check."
+        },
+        {
+          "name": "llm_prefilter",
+          "type": "string",
+          "location": "body",
+          "description": "CSS selector derived by the AI to narrow content scope before evaluation (auto-managed, do..."
+        },
+        {
+          "name": "llm_tokens_period_key",
+          "type": "string",
+          "location": "body",
+          "description": "Identifier of the current rollover period (e."
+        },
+        {
+          "name": "llm_tokens_this_period",
+          "type": "int",
+          "location": "body",
+          "description": "Tokens consumed by the AI on this watch within the current rollover period (currently month)."
+        },
+        {
+          "name": "llm_tokens_used_cumulative",
+          "type": "int",
+          "location": "body",
+          "description": "Total tokens consumed by the AI across all checks for this watch."
+        },
+        {
+          "name": "method",
+          "type": "string",
+          "location": "body",
+          "description": "HTTP method to use"
+        },
+        {
+          "name": "notification_body",
+          "type": "string",
+          "location": "body",
+          "description": "Custom notification body"
+        },
+        {
+          "name": "notification_format",
+          "type": "string",
+          "location": "body",
+          "description": "Format for notifications"
+        },
+        {
+          "name": "notification_muted",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether notifications are muted"
+        },
+        {
+          "name": "notification_screenshot",
+          "type": "bool",
+          "location": "body",
+          "description": "Include screenshot in notifications (if supported by notification URL)"
+        },
+        {
+          "name": "notification_title",
+          "type": "string",
+          "location": "body",
+          "description": "Custom notification title"
+        },
+        {
+          "name": "notification_urls",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Notification URLs for this web page change monitor (watch). Maximum 100 URLs."
+        },
+        {
+          "name": "overrides_watch",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether this tag's settings override watch settings for all watches in this tag/group. - true: Tag settings override watch settings - false: Tag settings do not override (watches use their own settings) - null: Not decided yet / inherit default behavior"
+        },
+        {
+          "name": "paused",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether the web page change monitor (watch) is paused"
+        },
+        {
+          "name": "price_change_threshold_percent",
+          "type": "float",
+          "location": "body",
+          "description": "Minimum price change percentage to trigger notification"
+        },
+        {
+          "name": "processor",
+          "type": "string",
+          "location": "body",
+          "description": "Optional processor mode to use for change detection. Defaults to `text_json_diff` if not specified."
+        },
+        {
+          "name": "proxy",
+          "type": "string",
+          "location": "body",
+          "description": "Proxy configuration"
+        },
+        {
+          "name": "remove_duplicate_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Remove duplicate lines from content"
+        },
+        {
+          "name": "sort_text_alphabetically",
+          "type": "bool",
+          "location": "body",
+          "description": "Sort lines alphabetically before comparison"
+        },
+        {
+          "name": "strip_ignored_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Remove lines matching ignore patterns"
+        },
+        {
+          "name": "subtractive_selectors",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "CSS/XPath selectors to remove content from the page"
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "location": "body",
+          "description": "Tag UUID to associate with this web page change monitor (watch)"
+        },
+        {
+          "name": "tags",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Array of tag UUIDs"
+        },
+        {
+          "name": "text_should_not_be_present",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text that should NOT be present (triggers alert if found)"
+        },
+        {
+          "name": "time-between-check-days",
+          "wire_name": "time_between_check.days",
+          "type": "int",
+          "location": "body",
+          "description": "Days"
+        },
+        {
+          "name": "time-between-check-hours",
+          "wire_name": "time_between_check.hours",
+          "type": "int",
+          "location": "body",
+          "description": "Hours"
+        },
+        {
+          "name": "time-between-check-minutes",
+          "wire_name": "time_between_check.minutes",
+          "type": "int",
+          "location": "body",
+          "description": "Minutes"
+        },
+        {
+          "name": "time-between-check-seconds",
+          "wire_name": "time_between_check.seconds",
+          "type": "int",
+          "location": "body",
+          "description": "Seconds"
+        },
+        {
+          "name": "time-between-check-weeks",
+          "wire_name": "time_between_check.weeks",
+          "type": "int",
+          "location": "body",
+          "description": "Weeks"
+        },
+        {
+          "name": "time_between_check_use_default",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to use global settings for time between checks - defaults to true if not set"
+        },
+        {
+          "name": "time-schedule-limit-enabled",
+          "wire_name": "time_schedule_limit.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-friday-enabled",
+          "wire_name": "time_schedule_limit.friday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-friday-start-time",
+          "wire_name": "time_schedule_limit.friday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-monday-enabled",
+          "wire_name": "time_schedule_limit.monday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-monday-start-time",
+          "wire_name": "time_schedule_limit.monday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-saturday-enabled",
+          "wire_name": "time_schedule_limit.saturday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-saturday-start-time",
+          "wire_name": "time_schedule_limit.saturday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-sunday-enabled",
+          "wire_name": "time_schedule_limit.sunday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-sunday-start-time",
+          "wire_name": "time_schedule_limit.sunday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-thursday-enabled",
+          "wire_name": "time_schedule_limit.thursday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-thursday-start-time",
+          "wire_name": "time_schedule_limit.thursday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-tuesday-enabled",
+          "wire_name": "time_schedule_limit.tuesday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-tuesday-start-time",
+          "wire_name": "time_schedule_limit.tuesday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-wednesday-enabled",
+          "wire_name": "time_schedule_limit.wednesday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-wednesday-start-time",
+          "wire_name": "time_schedule_limit.wednesday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "location": "body",
+          "description": "Custom title for the web page change monitor (watch), not to be confused with page_title",
+          "required": true
+        },
+        {
+          "name": "track_ldjson_price_data",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to track JSON-LD price data"
+        },
+        {
+          "name": "trigger_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text/regex patterns that must be present to trigger a change"
+        },
+        {
+          "name": "trim_text_whitespace",
+          "type": "bool",
+          "location": "body",
+          "description": "Strip leading/trailing whitespace from text"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "location": "body",
+          "description": "URL to monitor for changes"
+        },
+        {
+          "name": "url_match_pattern",
+          "type": "string",
+          "location": "body",
+          "description": "Automatically apply this tag to any watch whose URL matches this pattern. Supports fnmatch wildcards (* and ?): e.g. *://example.com/* or github.com/myorg. Plain strings are matched as case-insensitive substrings. Leave empty to disable auto-matching."
+        },
+        {
+          "name": "use_page_title_in_list",
+          "type": "bool",
+          "location": "body",
+          "description": "Display page title in watch list (null = use system default)"
+        },
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "body",
+          "description": "Unique identifier"
+        },
+        {
+          "name": "webdriver_delay",
+          "type": "int",
+          "location": "body",
+          "description": "Delay in seconds for webdriver"
+        },
+        {
+          "name": "webdriver_js_execute_code",
+          "type": "string",
+          "location": "body",
+          "description": "JavaScript code to execute"
+        }
+      ]
+    },
+    {
+      "name": "tag_delete",
+      "description": "Delete a tag/group and remove it from all web page change monitors (watches). Required: uuid. Destructive.",
+      "method": "DELETE",
+      "path": "/tag/{uuid}",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Tag unique ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "tag_get",
+      "description": "Retrieve tag information, set notification_muted status, recheck all web page change monitors (watches) in tag. Required: uuid. Optional: muted, recheck. Returns the Tag.",
+      "method": "GET",
+      "path": "/tag/{uuid}",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Tag unique ID",
+          "required": true
+        },
+        {
+          "name": "muted",
+          "type": "string",
+          "location": "query",
+          "description": "Set mute state"
+        },
+        {
+          "name": "recheck",
+          "type": "string",
+          "location": "query",
+          "description": "Queue all web page change monitors (watches) with this tag for recheck"
+        }
+      ]
+    },
+    {
+      "name": "tag_update",
+      "description": "Update an existing tag using JSON. Required: uuid. Optional: body, browser_steps, check_unique_lines (default: false) (plus 58 more).",
+      "method": "PUT",
+      "path": "/tag/{uuid}",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Tag unique ID",
+          "required": true
+        },
+        {
+          "name": "body",
+          "type": "string",
+          "location": "body",
+          "description": "HTTP request body"
+        },
+        {
+          "name": "browser_steps",
+          "type": "array",
+          "location": "body",
+          "description": "Browser automation steps. Maximum 100 steps allowed."
+        },
+        {
+          "name": "check_unique_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Compare against all history for unique lines"
+        },
+        {
+          "name": "conditions",
+          "type": "array",
+          "location": "body",
+          "description": "Array of condition rules for change detection logic (empty array when not set)"
+        },
+        {
+          "name": "conditions_match_logic",
+          "type": "string",
+          "location": "body",
+          "description": "Logic operator - ALL (match all conditions) or ANY (match any condition)"
+        },
+        {
+          "name": "date_created",
+          "type": "int",
+          "location": "body",
+          "description": "Unix timestamp of creation"
+        },
+        {
+          "name": "extract_lines_containing",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Keep only lines containing these substrings (plain text, case-insensitive) — simpler..."
+        },
+        {
+          "name": "extract_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Regex patterns to extract specific text after filtering"
+        },
+        {
+          "name": "fetch_backend",
+          "type": "string",
+          "location": "body",
+          "description": "Backend to use for fetching content."
+        },
+        {
+          "name": "filter_failure_notification_send",
+          "type": "bool",
+          "location": "body",
+          "description": "Send notification when filters fail to match content"
+        },
+        {
+          "name": "filter_text_added",
+          "type": "bool",
+          "location": "body",
+          "description": "Include added text in change detection"
+        },
+        {
+          "name": "filter_text_removed",
+          "type": "bool",
+          "location": "body",
+          "description": "Include removed text in change detection"
+        },
+        {
+          "name": "filter_text_replaced",
+          "type": "bool",
+          "location": "body",
+          "description": "Include replaced text in change detection"
+        },
+        {
+          "name": "follow_price_changes",
+          "type": "bool",
+          "location": "body",
+          "description": "Monitor and track price changes (restock_diff processor)"
+        },
+        {
+          "name": "has_ldjson_price_data",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether page has LD-JSON price data (auto-detected)"
+        },
+        {
+          "name": "headers",
+          "type": "object",
+          "location": "body",
+          "description": "HTTP headers to include in requests"
+        },
+        {
+          "name": "history_snapshot_max_length",
+          "type": "int",
+          "location": "body",
+          "description": "Maximum number of history snapshots to keep (null = use system default)"
+        },
+        {
+          "name": "ignore_status_codes",
+          "type": "bool",
+          "location": "body",
+          "description": "Ignore HTTP status code errors (boolean or null)"
+        },
+        {
+          "name": "ignore_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text patterns to ignore in change detection"
+        },
+        {
+          "name": "in_stock_only",
+          "type": "bool",
+          "location": "body",
+          "description": "Only trigger on in-stock transitions (restock_diff processor)"
+        },
+        {
+          "name": "include_filters",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "CSS/XPath selectors to extract specific content from the page"
+        },
+        {
+          "name": "llm_change_summary",
+          "type": "string",
+          "location": "body",
+          "description": "Instructions for the AI to summarise changes in notifications."
+        },
+        {
+          "name": "llm_evaluation_cache",
+          "type": "object",
+          "location": "body",
+          "description": "Internal cache of AI evaluation results keyed by (intent, diff) hash (auto-managed)."
+        },
+        {
+          "name": "llm_intent",
+          "type": "string",
+          "location": "body",
+          "description": "Plain-English intent for AI-based change filtering."
+        },
+        {
+          "name": "llm_last_tokens_used",
+          "type": "int",
+          "location": "body",
+          "description": "Number of tokens consumed by the AI on the most recent check."
+        },
+        {
+          "name": "llm_prefilter",
+          "type": "string",
+          "location": "body",
+          "description": "CSS selector derived by the AI to narrow content scope before evaluation (auto-managed, do..."
+        },
+        {
+          "name": "llm_tokens_period_key",
+          "type": "string",
+          "location": "body",
+          "description": "Identifier of the current rollover period (e."
+        },
+        {
+          "name": "llm_tokens_this_period",
+          "type": "int",
+          "location": "body",
+          "description": "Tokens consumed by the AI on this watch within the current rollover period (currently month)."
+        },
+        {
+          "name": "llm_tokens_used_cumulative",
+          "type": "int",
+          "location": "body",
+          "description": "Total tokens consumed by the AI across all checks for this watch."
+        },
+        {
+          "name": "method",
+          "type": "string",
+          "location": "body",
+          "description": "HTTP method to use"
+        },
+        {
+          "name": "notification_body",
+          "type": "string",
+          "location": "body",
+          "description": "Custom notification body"
+        },
+        {
+          "name": "notification_format",
+          "type": "string",
+          "location": "body",
+          "description": "Format for notifications"
+        },
+        {
+          "name": "notification_muted",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether notifications are muted"
+        },
+        {
+          "name": "notification_screenshot",
+          "type": "bool",
+          "location": "body",
+          "description": "Include screenshot in notifications (if supported by notification URL)"
+        },
+        {
+          "name": "notification_title",
+          "type": "string",
+          "location": "body",
+          "description": "Custom notification title"
+        },
+        {
+          "name": "notification_urls",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Notification URLs for this web page change monitor (watch). Maximum 100 URLs."
+        },
+        {
+          "name": "overrides_watch",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether this tag's settings override watch settings for all watches in this tag/group. - true: Tag settings override watch settings - false: Tag settings do not override (watches use their own settings) - null: Not decided yet / inherit default behavior"
+        },
+        {
+          "name": "paused",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether the web page change monitor (watch) is paused"
+        },
+        {
+          "name": "price_change_threshold_percent",
+          "type": "float",
+          "location": "body",
+          "description": "Minimum price change percentage to trigger notification"
+        },
+        {
+          "name": "processor",
+          "type": "string",
+          "location": "body",
+          "description": "Optional processor mode to use for change detection. Defaults to `text_json_diff` if not specified."
+        },
+        {
+          "name": "proxy",
+          "type": "string",
+          "location": "body",
+          "description": "Proxy configuration"
+        },
+        {
+          "name": "remove_duplicate_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Remove duplicate lines from content"
+        },
+        {
+          "name": "sort_text_alphabetically",
+          "type": "bool",
+          "location": "body",
+          "description": "Sort lines alphabetically before comparison"
+        },
+        {
+          "name": "strip_ignored_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Remove lines matching ignore patterns"
+        },
+        {
+          "name": "subtractive_selectors",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "CSS/XPath selectors to remove content from the page"
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "location": "body",
+          "description": "Tag UUID to associate with this web page change monitor (watch)"
+        },
+        {
+          "name": "tags",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Array of tag UUIDs"
+        },
+        {
+          "name": "text_should_not_be_present",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text that should NOT be present (triggers alert if found)"
+        },
+        {
+          "name": "time-between-check-days",
+          "wire_name": "time_between_check.days",
+          "type": "int",
+          "location": "body",
+          "description": "Days"
+        },
+        {
+          "name": "time-between-check-hours",
+          "wire_name": "time_between_check.hours",
+          "type": "int",
+          "location": "body",
+          "description": "Hours"
+        },
+        {
+          "name": "time-between-check-minutes",
+          "wire_name": "time_between_check.minutes",
+          "type": "int",
+          "location": "body",
+          "description": "Minutes"
+        },
+        {
+          "name": "time-between-check-seconds",
+          "wire_name": "time_between_check.seconds",
+          "type": "int",
+          "location": "body",
+          "description": "Seconds"
+        },
+        {
+          "name": "time-between-check-weeks",
+          "wire_name": "time_between_check.weeks",
+          "type": "int",
+          "location": "body",
+          "description": "Weeks"
+        },
+        {
+          "name": "time_between_check_use_default",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to use global settings for time between checks - defaults to true if not set"
+        },
+        {
+          "name": "time-schedule-limit-enabled",
+          "wire_name": "time_schedule_limit.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-friday-enabled",
+          "wire_name": "time_schedule_limit.friday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-friday-start-time",
+          "wire_name": "time_schedule_limit.friday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-monday-enabled",
+          "wire_name": "time_schedule_limit.monday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-monday-start-time",
+          "wire_name": "time_schedule_limit.monday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-saturday-enabled",
+          "wire_name": "time_schedule_limit.saturday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-saturday-start-time",
+          "wire_name": "time_schedule_limit.saturday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-sunday-enabled",
+          "wire_name": "time_schedule_limit.sunday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-sunday-start-time",
+          "wire_name": "time_schedule_limit.sunday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-thursday-enabled",
+          "wire_name": "time_schedule_limit.thursday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-thursday-start-time",
+          "wire_name": "time_schedule_limit.thursday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-tuesday-enabled",
+          "wire_name": "time_schedule_limit.tuesday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-tuesday-start-time",
+          "wire_name": "time_schedule_limit.tuesday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-wednesday-enabled",
+          "wire_name": "time_schedule_limit.wednesday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-wednesday-start-time",
+          "wire_name": "time_schedule_limit.wednesday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "location": "body",
+          "description": "Custom title for the web page change monitor (watch), not to be confused with page_title"
+        },
+        {
+          "name": "track_ldjson_price_data",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to track JSON-LD price data"
+        },
+        {
+          "name": "trigger_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text/regex patterns that must be present to trigger a change"
+        },
+        {
+          "name": "trim_text_whitespace",
+          "type": "bool",
+          "location": "body",
+          "description": "Strip leading/trailing whitespace from text"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "location": "body",
+          "description": "URL to monitor for changes"
+        },
+        {
+          "name": "url_match_pattern",
+          "type": "string",
+          "location": "body",
+          "description": "Automatically apply this tag to any watch whose URL matches this pattern. Supports fnmatch wildcards (* and ?): e.g. *://example.com/* or github.com/myorg. Plain strings are matched as case-insensitive substrings. Leave empty to disable auto-matching."
+        },
+        {
+          "name": "use_page_title_in_list",
+          "type": "bool",
+          "location": "body",
+          "description": "Display page title in watch list (null = use system default)"
+        },
+        {
+          "name": "uuid-2",
+          "wire_name": "uuid",
+          "type": "string",
+          "location": "body",
+          "description": "Unique identifier"
+        },
+        {
+          "name": "webdriver_delay",
+          "type": "int",
+          "location": "body",
+          "description": "Delay in seconds for webdriver"
+        },
+        {
+          "name": "webdriver_js_execute_code",
+          "type": "string",
+          "location": "body",
+          "description": "JavaScript code to execute"
+        }
+      ]
+    },
+    {
+      "name": "tags_list",
+      "description": "Return list of available tags/groups. Returns the TagsListResponse.",
+      "method": "GET",
+      "path": "/tags",
+      "params": []
+    },
+    {
+      "name": "watch_create",
+      "description": "Create a single web page change monitor (watch). Requires at least `url` to be set. Every watch can be configured with: - **Processor mode**: `processor` field (`restock_diff` or `text_json_diff` - default) - **Notification settings**: `notification_urls` (array), `notification_title`, `notification_body`, `notification_format`, `notification_muted` - **Tags/Groups**: `tag` (UUID string) or `tags` (array of UUIDs) - **Check settings**: `time_between_check`, `paused`, `method`, `fetch_backend` - **Advanced options**: `headers`, `body`, `proxy`, `browser_steps`, and more. Required: url. Optional: body, browser_steps, check_unique_lines (default: false) (plus 55 more).",
+      "method": "POST",
+      "path": "/watch",
+      "params": [
+        {
+          "name": "body",
+          "type": "string",
+          "location": "body",
+          "description": "HTTP request body"
+        },
+        {
+          "name": "browser_steps",
+          "type": "array",
+          "location": "body",
+          "description": "Browser automation steps. Maximum 100 steps allowed."
+        },
+        {
+          "name": "check_unique_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Compare against all history for unique lines"
+        },
+        {
+          "name": "conditions",
+          "type": "array",
+          "location": "body",
+          "description": "Array of condition rules for change detection logic (empty array when not set)"
+        },
+        {
+          "name": "conditions_match_logic",
+          "type": "string",
+          "location": "body",
+          "description": "Logic operator - ALL (match all conditions) or ANY (match any condition)"
+        },
+        {
+          "name": "date_created",
+          "type": "int",
+          "location": "body",
+          "description": "Unix timestamp of creation"
+        },
+        {
+          "name": "extract_lines_containing",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Keep only lines containing these substrings (plain text, case-insensitive) — simpler..."
+        },
+        {
+          "name": "extract_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Regex patterns to extract specific text after filtering"
+        },
+        {
+          "name": "fetch_backend",
+          "type": "string",
+          "location": "body",
+          "description": "Backend to use for fetching content."
+        },
+        {
+          "name": "filter_failure_notification_send",
+          "type": "bool",
+          "location": "body",
+          "description": "Send notification when filters fail to match content"
+        },
+        {
+          "name": "filter_text_added",
+          "type": "bool",
+          "location": "body",
+          "description": "Include added text in change detection"
+        },
+        {
+          "name": "filter_text_removed",
+          "type": "bool",
+          "location": "body",
+          "description": "Include removed text in change detection"
+        },
+        {
+          "name": "filter_text_replaced",
+          "type": "bool",
+          "location": "body",
+          "description": "Include replaced text in change detection"
+        },
+        {
+          "name": "follow_price_changes",
+          "type": "bool",
+          "location": "body",
+          "description": "Monitor and track price changes (restock_diff processor)"
+        },
+        {
+          "name": "has_ldjson_price_data",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether page has LD-JSON price data (auto-detected)"
+        },
+        {
+          "name": "headers",
+          "type": "object",
+          "location": "body",
+          "description": "HTTP headers to include in requests"
+        },
+        {
+          "name": "history_snapshot_max_length",
+          "type": "int",
+          "location": "body",
+          "description": "Maximum number of history snapshots to keep (null = use system default)"
+        },
+        {
+          "name": "ignore_status_codes",
+          "type": "bool",
+          "location": "body",
+          "description": "Ignore HTTP status code errors (boolean or null)"
+        },
+        {
+          "name": "ignore_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text patterns to ignore in change detection"
+        },
+        {
+          "name": "in_stock_only",
+          "type": "bool",
+          "location": "body",
+          "description": "Only trigger on in-stock transitions (restock_diff processor)"
+        },
+        {
+          "name": "include_filters",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "CSS/XPath selectors to extract specific content from the page"
+        },
+        {
+          "name": "llm_change_summary",
+          "type": "string",
+          "location": "body",
+          "description": "Instructions for the AI to summarise changes in notifications."
+        },
+        {
+          "name": "llm_evaluation_cache",
+          "type": "object",
+          "location": "body",
+          "description": "Internal cache of AI evaluation results keyed by (intent, diff) hash (auto-managed)."
+        },
+        {
+          "name": "llm_intent",
+          "type": "string",
+          "location": "body",
+          "description": "Plain-English intent for AI-based change filtering."
+        },
+        {
+          "name": "llm_last_tokens_used",
+          "type": "int",
+          "location": "body",
+          "description": "Number of tokens consumed by the AI on the most recent check."
+        },
+        {
+          "name": "llm_prefilter",
+          "type": "string",
+          "location": "body",
+          "description": "CSS selector derived by the AI to narrow content scope before evaluation (auto-managed, do..."
+        },
+        {
+          "name": "llm_tokens_period_key",
+          "type": "string",
+          "location": "body",
+          "description": "Identifier of the current rollover period (e."
+        },
+        {
+          "name": "llm_tokens_this_period",
+          "type": "int",
+          "location": "body",
+          "description": "Tokens consumed by the AI on this watch within the current rollover period (currently month)."
+        },
+        {
+          "name": "llm_tokens_used_cumulative",
+          "type": "int",
+          "location": "body",
+          "description": "Total tokens consumed by the AI across all checks for this watch."
+        },
+        {
+          "name": "method",
+          "type": "string",
+          "location": "body",
+          "description": "HTTP method to use"
+        },
+        {
+          "name": "notification_body",
+          "type": "string",
+          "location": "body",
+          "description": "Custom notification body"
+        },
+        {
+          "name": "notification_format",
+          "type": "string",
+          "location": "body",
+          "description": "Format for notifications"
+        },
+        {
+          "name": "notification_muted",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether notifications are muted"
+        },
+        {
+          "name": "notification_screenshot",
+          "type": "bool",
+          "location": "body",
+          "description": "Include screenshot in notifications (if supported by notification URL)"
+        },
+        {
+          "name": "notification_title",
+          "type": "string",
+          "location": "body",
+          "description": "Custom notification title"
+        },
+        {
+          "name": "notification_urls",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Notification URLs for this web page change monitor (watch). Maximum 100 URLs."
+        },
+        {
+          "name": "paused",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether the web page change monitor (watch) is paused"
+        },
+        {
+          "name": "price_change_threshold_percent",
+          "type": "float",
+          "location": "body",
+          "description": "Minimum price change percentage to trigger notification"
+        },
+        {
+          "name": "processor",
+          "type": "string",
+          "location": "body",
+          "description": "Optional processor mode to use for change detection. Defaults to `text_json_diff` if not specified."
+        },
+        {
+          "name": "proxy",
+          "type": "string",
+          "location": "body",
+          "description": "Proxy configuration"
+        },
+        {
+          "name": "remove_duplicate_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Remove duplicate lines from content"
+        },
+        {
+          "name": "sort_text_alphabetically",
+          "type": "bool",
+          "location": "body",
+          "description": "Sort lines alphabetically before comparison"
+        },
+        {
+          "name": "strip_ignored_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Remove lines matching ignore patterns"
+        },
+        {
+          "name": "subtractive_selectors",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "CSS/XPath selectors to remove content from the page"
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "location": "body",
+          "description": "Tag UUID to associate with this web page change monitor (watch)"
+        },
+        {
+          "name": "tags",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Array of tag UUIDs"
+        },
+        {
+          "name": "text_should_not_be_present",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text that should NOT be present (triggers alert if found)"
+        },
+        {
+          "name": "time-between-check-days",
+          "wire_name": "time_between_check.days",
+          "type": "int",
+          "location": "body",
+          "description": "Days"
+        },
+        {
+          "name": "time-between-check-hours",
+          "wire_name": "time_between_check.hours",
+          "type": "int",
+          "location": "body",
+          "description": "Hours"
+        },
+        {
+          "name": "time-between-check-minutes",
+          "wire_name": "time_between_check.minutes",
+          "type": "int",
+          "location": "body",
+          "description": "Minutes"
+        },
+        {
+          "name": "time-between-check-seconds",
+          "wire_name": "time_between_check.seconds",
+          "type": "int",
+          "location": "body",
+          "description": "Seconds"
+        },
+        {
+          "name": "time-between-check-weeks",
+          "wire_name": "time_between_check.weeks",
+          "type": "int",
+          "location": "body",
+          "description": "Weeks"
+        },
+        {
+          "name": "time_between_check_use_default",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to use global settings for time between checks - defaults to true if not set"
+        },
+        {
+          "name": "time-schedule-limit-enabled",
+          "wire_name": "time_schedule_limit.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-friday-enabled",
+          "wire_name": "time_schedule_limit.friday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-friday-start-time",
+          "wire_name": "time_schedule_limit.friday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-monday-enabled",
+          "wire_name": "time_schedule_limit.monday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-monday-start-time",
+          "wire_name": "time_schedule_limit.monday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-saturday-enabled",
+          "wire_name": "time_schedule_limit.saturday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-saturday-start-time",
+          "wire_name": "time_schedule_limit.saturday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-sunday-enabled",
+          "wire_name": "time_schedule_limit.sunday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-sunday-start-time",
+          "wire_name": "time_schedule_limit.sunday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-thursday-enabled",
+          "wire_name": "time_schedule_limit.thursday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-thursday-start-time",
+          "wire_name": "time_schedule_limit.thursday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-tuesday-enabled",
+          "wire_name": "time_schedule_limit.tuesday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-tuesday-start-time",
+          "wire_name": "time_schedule_limit.tuesday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-wednesday-enabled",
+          "wire_name": "time_schedule_limit.wednesday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-wednesday-start-time",
+          "wire_name": "time_schedule_limit.wednesday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "location": "body",
+          "description": "Custom title for the web page change monitor (watch), not to be confused with page_title"
+        },
+        {
+          "name": "track_ldjson_price_data",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to track JSON-LD price data"
+        },
+        {
+          "name": "trigger_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text/regex patterns that must be present to trigger a change"
+        },
+        {
+          "name": "trim_text_whitespace",
+          "type": "bool",
+          "location": "body",
+          "description": "Strip leading/trailing whitespace from text"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "location": "body",
+          "description": "URL to monitor for changes",
+          "required": true
+        },
+        {
+          "name": "use_page_title_in_list",
+          "type": "bool",
+          "location": "body",
+          "description": "Display page title in watch list (null = use system default)"
+        },
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "body",
+          "description": "Unique identifier"
+        },
+        {
+          "name": "webdriver_delay",
+          "type": "int",
+          "location": "body",
+          "description": "Delay in seconds for webdriver"
+        },
+        {
+          "name": "webdriver_js_execute_code",
+          "type": "string",
+          "location": "body",
+          "description": "JavaScript code to execute"
+        }
+      ]
+    },
+    {
+      "name": "watch_delete",
+      "description": "Delete a web page change monitor (watch) and all related history. Required: uuid. Destructive.",
+      "method": "DELETE",
+      "path": "/watch/{uuid}",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Web page change monitor (watch) unique ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "watch_get",
+      "description": "Retrieve web page change monitor (watch) information and set muted/paused status. Returns the FULL Watch JSON. Required: uuid. Optional: recheck, paused, muted.",
+      "method": "GET",
+      "path": "/watch/{uuid}",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Web page change monitor (watch) unique ID",
+          "required": true
+        },
+        {
+          "name": "recheck",
+          "type": "string",
+          "location": "query",
+          "description": "Recheck this web page change monitor (watch)"
+        },
+        {
+          "name": "paused",
+          "type": "string",
+          "location": "query",
+          "description": "Set pause state"
+        },
+        {
+          "name": "muted",
+          "type": "string",
+          "location": "query",
+          "description": "Set mute state"
+        }
+      ]
+    },
+    {
+      "name": "watch_list-watches",
+      "description": "Return concise list of available web page change monitors (watches) and basic info. Optional: recheck_all, tag. Returns the WatchListWatchesResponse.",
+      "method": "GET",
+      "path": "/watch",
+      "params": [
+        {
+          "name": "recheck_all",
+          "type": "string",
+          "location": "query",
+          "description": "Set to 1 to force recheck of all watches"
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "location": "query",
+          "description": "Tag name to filter results"
+        }
+      ]
+    },
+    {
+      "name": "watch_update",
+      "description": "Update an existing web page change monitor (watch) using JSON. Accepts the same structure as returned in [get single watch information](#operation/getWatch). Required: uuid. Optional: body, browser_steps, check_unique_lines (default: false) (plus 57 more).",
+      "method": "PUT",
+      "path": "/watch/{uuid}",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Web page change monitor (watch) unique ID",
+          "required": true
+        },
+        {
+          "name": "body",
+          "type": "string",
+          "location": "body",
+          "description": "HTTP request body"
+        },
+        {
+          "name": "browser_steps",
+          "type": "array",
+          "location": "body",
+          "description": "Browser automation steps. Maximum 100 steps allowed."
+        },
+        {
+          "name": "check_unique_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Compare against all history for unique lines"
+        },
+        {
+          "name": "conditions",
+          "type": "array",
+          "location": "body",
+          "description": "Array of condition rules for change detection logic (empty array when not set)"
+        },
+        {
+          "name": "conditions_match_logic",
+          "type": "string",
+          "location": "body",
+          "description": "Logic operator - ALL (match all conditions) or ANY (match any condition)"
+        },
+        {
+          "name": "date_created",
+          "type": "int",
+          "location": "body",
+          "description": "Unix timestamp of creation"
+        },
+        {
+          "name": "extract_lines_containing",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Keep only lines containing these substrings (plain text, case-insensitive) — simpler..."
+        },
+        {
+          "name": "extract_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Regex patterns to extract specific text after filtering"
+        },
+        {
+          "name": "fetch_backend",
+          "type": "string",
+          "location": "body",
+          "description": "Backend to use for fetching content."
+        },
+        {
+          "name": "filter_failure_notification_send",
+          "type": "bool",
+          "location": "body",
+          "description": "Send notification when filters fail to match content"
+        },
+        {
+          "name": "filter_text_added",
+          "type": "bool",
+          "location": "body",
+          "description": "Include added text in change detection"
+        },
+        {
+          "name": "filter_text_removed",
+          "type": "bool",
+          "location": "body",
+          "description": "Include removed text in change detection"
+        },
+        {
+          "name": "filter_text_replaced",
+          "type": "bool",
+          "location": "body",
+          "description": "Include replaced text in change detection"
+        },
+        {
+          "name": "follow_price_changes",
+          "type": "bool",
+          "location": "body",
+          "description": "Monitor and track price changes (restock_diff processor)"
+        },
+        {
+          "name": "has_ldjson_price_data",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether page has LD-JSON price data (auto-detected)"
+        },
+        {
+          "name": "headers",
+          "type": "object",
+          "location": "body",
+          "description": "HTTP headers to include in requests"
+        },
+        {
+          "name": "history_snapshot_max_length",
+          "type": "int",
+          "location": "body",
+          "description": "Maximum number of history snapshots to keep (null = use system default)"
+        },
+        {
+          "name": "ignore_status_codes",
+          "type": "bool",
+          "location": "body",
+          "description": "Ignore HTTP status code errors (boolean or null)"
+        },
+        {
+          "name": "ignore_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text patterns to ignore in change detection"
+        },
+        {
+          "name": "in_stock_only",
+          "type": "bool",
+          "location": "body",
+          "description": "Only trigger on in-stock transitions (restock_diff processor)"
+        },
+        {
+          "name": "include_filters",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "CSS/XPath selectors to extract specific content from the page"
+        },
+        {
+          "name": "last_viewed",
+          "type": "int",
+          "location": "body",
+          "description": "Unix timestamp in seconds of the last time the watch was viewed. Setting it to a value higher than `last_changed` in the 'Update watch' endpoint marks the watch as viewed."
+        },
+        {
+          "name": "llm_change_summary",
+          "type": "string",
+          "location": "body",
+          "description": "Instructions for the AI to summarise changes in notifications."
+        },
+        {
+          "name": "llm_evaluation_cache",
+          "type": "object",
+          "location": "body",
+          "description": "Internal cache of AI evaluation results keyed by (intent, diff) hash (auto-managed)."
+        },
+        {
+          "name": "llm_intent",
+          "type": "string",
+          "location": "body",
+          "description": "Plain-English intent for AI-based change filtering."
+        },
+        {
+          "name": "llm_last_tokens_used",
+          "type": "int",
+          "location": "body",
+          "description": "Number of tokens consumed by the AI on the most recent check."
+        },
+        {
+          "name": "llm_prefilter",
+          "type": "string",
+          "location": "body",
+          "description": "CSS selector derived by the AI to narrow content scope before evaluation (auto-managed, do..."
+        },
+        {
+          "name": "llm_tokens_period_key",
+          "type": "string",
+          "location": "body",
+          "description": "Identifier of the current rollover period (e."
+        },
+        {
+          "name": "llm_tokens_this_period",
+          "type": "int",
+          "location": "body",
+          "description": "Tokens consumed by the AI on this watch within the current rollover period (currently month)."
+        },
+        {
+          "name": "llm_tokens_used_cumulative",
+          "type": "int",
+          "location": "body",
+          "description": "Total tokens consumed by the AI across all checks for this watch."
+        },
+        {
+          "name": "method",
+          "type": "string",
+          "location": "body",
+          "description": "HTTP method to use"
+        },
+        {
+          "name": "notification_body",
+          "type": "string",
+          "location": "body",
+          "description": "Custom notification body"
+        },
+        {
+          "name": "notification_format",
+          "type": "string",
+          "location": "body",
+          "description": "Format for notifications"
+        },
+        {
+          "name": "notification_muted",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether notifications are muted"
+        },
+        {
+          "name": "notification_screenshot",
+          "type": "bool",
+          "location": "body",
+          "description": "Include screenshot in notifications (if supported by notification URL)"
+        },
+        {
+          "name": "notification_title",
+          "type": "string",
+          "location": "body",
+          "description": "Custom notification title"
+        },
+        {
+          "name": "notification_urls",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Notification URLs for this web page change monitor (watch). Maximum 100 URLs."
+        },
+        {
+          "name": "paused",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether the web page change monitor (watch) is paused"
+        },
+        {
+          "name": "price_change_threshold_percent",
+          "type": "float",
+          "location": "body",
+          "description": "Minimum price change percentage to trigger notification"
+        },
+        {
+          "name": "processor",
+          "type": "string",
+          "location": "body",
+          "description": "Optional processor mode to use for change detection. Defaults to `text_json_diff` if not specified."
+        },
+        {
+          "name": "proxy",
+          "type": "string",
+          "location": "body",
+          "description": "Proxy configuration"
+        },
+        {
+          "name": "remove_duplicate_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Remove duplicate lines from content"
+        },
+        {
+          "name": "sort_text_alphabetically",
+          "type": "bool",
+          "location": "body",
+          "description": "Sort lines alphabetically before comparison"
+        },
+        {
+          "name": "strip_ignored_lines",
+          "type": "bool",
+          "location": "body",
+          "description": "Remove lines matching ignore patterns"
+        },
+        {
+          "name": "subtractive_selectors",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "CSS/XPath selectors to remove content from the page"
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "location": "body",
+          "description": "Tag UUID to associate with this web page change monitor (watch)"
+        },
+        {
+          "name": "tags",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Array of tag UUIDs"
+        },
+        {
+          "name": "text_should_not_be_present",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text that should NOT be present (triggers alert if found)"
+        },
+        {
+          "name": "time-between-check-days",
+          "wire_name": "time_between_check.days",
+          "type": "int",
+          "location": "body",
+          "description": "Days"
+        },
+        {
+          "name": "time-between-check-hours",
+          "wire_name": "time_between_check.hours",
+          "type": "int",
+          "location": "body",
+          "description": "Hours"
+        },
+        {
+          "name": "time-between-check-minutes",
+          "wire_name": "time_between_check.minutes",
+          "type": "int",
+          "location": "body",
+          "description": "Minutes"
+        },
+        {
+          "name": "time-between-check-seconds",
+          "wire_name": "time_between_check.seconds",
+          "type": "int",
+          "location": "body",
+          "description": "Seconds"
+        },
+        {
+          "name": "time-between-check-weeks",
+          "wire_name": "time_between_check.weeks",
+          "type": "int",
+          "location": "body",
+          "description": "Weeks"
+        },
+        {
+          "name": "time_between_check_use_default",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to use global settings for time between checks - defaults to true if not set"
+        },
+        {
+          "name": "time-schedule-limit-enabled",
+          "wire_name": "time_schedule_limit.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-friday-enabled",
+          "wire_name": "time_schedule_limit.friday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-friday-start-time",
+          "wire_name": "time_schedule_limit.friday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-monday-enabled",
+          "wire_name": "time_schedule_limit.monday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-monday-start-time",
+          "wire_name": "time_schedule_limit.monday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-saturday-enabled",
+          "wire_name": "time_schedule_limit.saturday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-saturday-start-time",
+          "wire_name": "time_schedule_limit.saturday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-sunday-enabled",
+          "wire_name": "time_schedule_limit.sunday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-sunday-start-time",
+          "wire_name": "time_schedule_limit.sunday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-thursday-enabled",
+          "wire_name": "time_schedule_limit.thursday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-thursday-start-time",
+          "wire_name": "time_schedule_limit.thursday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-tuesday-enabled",
+          "wire_name": "time_schedule_limit.tuesday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-tuesday-start-time",
+          "wire_name": "time_schedule_limit.tuesday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "time-schedule-limit-wednesday-enabled",
+          "wire_name": "time_schedule_limit.wednesday.enabled",
+          "type": "bool",
+          "location": "body",
+          "description": "Enabled"
+        },
+        {
+          "name": "time-schedule-limit-wednesday-start-time",
+          "wire_name": "time_schedule_limit.wednesday.start_time",
+          "type": "string",
+          "location": "body",
+          "description": "Start time in HH:MM format"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "location": "body",
+          "description": "Custom title for the web page change monitor (watch), not to be confused with page_title"
+        },
+        {
+          "name": "track_ldjson_price_data",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to track JSON-LD price data"
+        },
+        {
+          "name": "trigger_text",
+          "type": "string_csv_array",
+          "location": "body",
+          "description": "Text/regex patterns that must be present to trigger a change"
+        },
+        {
+          "name": "trim_text_whitespace",
+          "type": "bool",
+          "location": "body",
+          "description": "Strip leading/trailing whitespace from text"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "location": "body",
+          "description": "URL to monitor for changes"
+        },
+        {
+          "name": "use_page_title_in_list",
+          "type": "bool",
+          "location": "body",
+          "description": "Display page title in watch list (null = use system default)"
+        },
+        {
+          "name": "uuid-2",
+          "wire_name": "uuid",
+          "type": "string",
+          "location": "body",
+          "description": "Unique identifier"
+        },
+        {
+          "name": "webdriver_delay",
+          "type": "int",
+          "location": "body",
+          "description": "Delay in seconds for webdriver"
+        },
+        {
+          "name": "webdriver_js_execute_code",
+          "type": "string",
+          "location": "body",
+          "description": "JavaScript code to execute"
+        }
+      ]
+    },
+    {
+      "name": "watch_difference_get-watch-history-diff",
+      "description": "Generate a difference (comparison) between two historical snapshots of a web page change monitor (watch). This endpoint compares content between two points in time and returns the differences in your chosen format. Perfect for reviewing what changed between specific versions or comparing recent changes. **Timestamp Keywords:** - Use `'latest'` for the most recent snapshot (to_timestamp) - Use `'previous'` for the second-most-recent snapshot (from_timestamp) - Or use specific Unix timestamps from the watch history **Format Options:** - `text` (default): Plain text with (removed) and (added) prefixes - `html`: HTML format with (removed) and (added) text - `htmlcolor`: Rich HTML with colored highlights (green for additions, red for deletions) **Word-Level Diffing:** - Enable word-level granularity with `word_diff=true` for detailed inline comparisons - Disable with `word_diff=false` for line-level comparisons only (default false/off, line-level mode by default) **Raw Diff Output:** - Use `no_markup=true` to get raw diff content without any formatting applied - Returns content with placeholders for opening/closing tags of changes - Allows you to implement your own custom colorisation or formatting - Skips all HTML color application and service tweaks (added text, html color tags, etc). Required: uuid, from_timestamp, to_timestamp. Optional: format (default: text), word_diff (default: false), no_markup (default: false) (plus 6 more).",
+      "method": "GET",
+      "path": "/watch/{uuid}/difference/{from_timestamp}/{to_timestamp}",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Web page change monitor (watch) unique ID",
+          "required": true
+        },
+        {
+          "name": "from_timestamp",
+          "type": "string",
+          "location": "path",
+          "description": "Starting snapshot timestamp, 'previous' for second-most-recent, or specific Unix timestamp",
+          "required": true
+        },
+        {
+          "name": "to_timestamp",
+          "type": "string",
+          "location": "path",
+          "description": "Ending snapshot timestamp, 'latest' for most recent, or specific Unix timestamp",
+          "required": true
+        },
+        {
+          "name": "format",
+          "type": "string",
+          "location": "query",
+          "description": "Output format for the diff: - `text` (default): Plain text with (removed) and (added) prefixes - `html`: Basic HTML format - `htmlcolor`: Rich HTML with colored backgrounds (red for deletions, green for additions) - `markdown`: Markdown format with HTML rendering"
+        },
+        {
+          "name": "word_diff",
+          "type": "string",
+          "location": "query",
+          "description": "Enable word-level diffing for more granular comparisons. When enabled, changes are highlighted at the word level rather than line level. Default is false (line-level mode). Accepts: true, false, 1, 0, yes, no, on, off"
+        },
+        {
+          "name": "no_markup",
+          "type": "string",
+          "location": "query",
+          "description": "When set to true, returns the raw diff content without any markup formatting. The content will include placeholders for opening/closing tags of the changes, allowing you to implement your own custom colorisation or formatting. This skips all HTML color application and service tweaks. Accepts: true, false, 1, 0, yes, no, on, off"
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "location": "query",
+          "description": "Diff granularity type: - `diffLines` (default): Line-level comparison, showing which lines changed - `diffWords`: Word-level comparison, showing which words changed within lines This parameter is an alternative to `word_diff` for better alignment with the UI. If both are specified, `type=diffWords` will enable word-level diffing."
+        },
+        {
+          "name": "changesOnly",
+          "type": "string",
+          "location": "query",
+          "description": "When enabled, only show lines/content that changed (no surrounding context). When disabled, include unchanged lines for context around changes. Accepts: true, false, 1, 0, yes, no, on, off"
+        },
+        {
+          "name": "ignoreWhitespace",
+          "type": "string",
+          "location": "query",
+          "description": "When enabled, ignore whitespace-only changes (spaces, tabs, newlines). Useful for focusing on content changes and ignoring formatting differences. Accepts: true, false, 1, 0, yes, no, on, off"
+        },
+        {
+          "name": "removed",
+          "type": "string",
+          "location": "query",
+          "description": "Include removed/deleted content in the diff output. When disabled, content that was deleted will not appear in the diff. Accepts: true, false, 1, 0, yes, no, on, off"
+        },
+        {
+          "name": "added",
+          "type": "string",
+          "location": "query",
+          "description": "Include added/new content in the diff output. When disabled, content that was added will not appear in the diff. Accepts: true, false, 1, 0, yes, no, on, off"
+        },
+        {
+          "name": "replaced",
+          "type": "string",
+          "location": "query",
+          "description": "Include replaced/modified content in the diff output. When disabled, content that was modified (changed from one value to another) will not appear in the diff. Accepts: true, false, 1, 0, yes, no, on, off"
+        }
+      ]
+    },
+    {
+      "name": "watch_favicon_get-watch",
+      "description": "Get the favicon for a web page change monitor (watch) as displayed in the watch overview list. Required: uuid.",
+      "method": "GET",
+      "path": "/watch/{uuid}/favicon",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Web page change monitor (watch) unique ID",
+          "required": true
+        }
+      ],
+      "header_overrides": [
+        {
+          "name": "Accept",
+          "value": "image/*"
+        }
+      ]
+    },
+    {
+      "name": "watch_history_get-watch",
+      "description": "Get a list of all historical snapshots available for a web page change monitor (watch), use the key `timestamp` as the query argument for fetching a single watch history snapshot. Required: uuid. Returns the WatchHistory.",
+      "method": "GET",
+      "path": "/watch/{uuid}/history",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Web page change monitor (watch) unique ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "watch_history_get-watch-snapshot",
+      "description": "Get single snapshot from web page change monitor (watch). Use 'latest' for the most recent snapshot. Use the Watch History API to get a list of timestamps to pass. Required: uuid, timestamp. Optional: html.",
+      "method": "GET",
+      "path": "/watch/{uuid}/history/{timestamp}",
+      "params": [
+        {
+          "name": "uuid",
+          "type": "string",
+          "location": "path",
+          "description": "Web page change monitor (watch) unique ID",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "string",
+          "location": "path",
+          "description": "Snapshot timestamp or 'latest'",
+          "required": true
+        },
+        {
+          "name": "html",
+          "type": "string",
+          "location": "query",
+          "description": "Set to 1 to return the last HTML"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# Copy to config.toml, then: export CHANGEDETECTION_CONFIG="$PWD/config.toml"
+# config.toml is gitignored — never commit real credentials.
+
+# API root of your instance (note the /api/v1 suffix). changedetection default port is 5000.
+base_url = "https://your-host/api/v1"
+
+# API key from the dashboard: Settings > API. Omit if your instance needs no auth.
+api_key = "your-key-here"
+
+# Set true only for self-signed TLS certificates (equivalent to curl -k).
+insecure_tls = false

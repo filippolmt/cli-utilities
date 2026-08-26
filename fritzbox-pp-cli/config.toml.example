@@ -1,0 +1,21 @@
+# Copy to config.toml, then: export FRITZBOX_CONFIG="$PWD/config.toml"
+# config.toml is gitignored — never commit real credentials.
+#
+# Everything here can also come from the environment, which wins over the file:
+#   FRITZBOX_ADDRESS, FRITZBOX_USERNAME, FRITZBOX_PASSWORD, FRITZBOX_SID
+
+# Router origin on your local network. Leave the default unless you renamed the
+# box or reach it by address. Do NOT add the TR-064 port here: the CLI switches
+# to port 49000 for TR-064 on its own.
+base_url = "http://fritz.box"
+
+# Your FRITZ!Box password. A box with a single user accepts a password-only
+# login, in which case FRITZBOX_USERNAME can be left unset.
+password = "your-password-here"
+
+# Session id minted by `fritzbox-pp-cli auth login`. Leave this blank: the CLI
+# fills it in and refreshes it on its own when it expires.
+sid = ""
+
+# Before anything works, enable TR-064 on the router:
+#   Home Network > Network > Network Settings > Allow access for applications

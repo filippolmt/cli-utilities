@@ -1,0 +1,5 @@
+config.toml
+/fritzbox-pp-cli
+/fritzbox-pp-mcp
+.fritzbox-home/
+bin/

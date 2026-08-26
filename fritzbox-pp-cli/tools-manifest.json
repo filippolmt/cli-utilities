@@ -1,0 +1,113 @@
+{
+  "api_name": "fritzbox",
+  "base_url": "http://fritz.box",
+  "description": "Every FRITZ!Box feature the shell scripts have, plus a local database that remembers what your router forgets.",
+  "mcp_ready": "full",
+  "http_transport": "standard",
+  "auth": {
+    "type": "api_key",
+    "header": "sid",
+    "in": "query",
+    "env_vars": [
+      "FRITZBOX_PASSWORD",
+      "FRITZBOX_SID"
+    ],
+    "env_var_specs": [
+      {
+        "name": "FRITZBOX_PASSWORD",
+        "kind": "per_call",
+        "required": false,
+        "sensitive": true
+      },
+      {
+        "name": "FRITZBOX_SID",
+        "kind": "per_call",
+        "required": false,
+        "sensitive": true
+      }
+    ]
+  },
+  "required_headers": [],
+  "tools": [
+    {
+      "name": "dect_list",
+      "description": "List the registered DECT handsets. Optional: query. Returns array of Handset.",
+      "method": "GET",
+      "path": "/query.lua",
+      "params": [
+        {
+          "name": "query",
+          "wire_name": "dect",
+          "type": "string",
+          "location": "query",
+          "description": "Data-path expression selecting handset fields"
+        }
+      ]
+    },
+    {
+      "name": "hosts_list",
+      "description": "List every device the router knows, online and offline. Optional: query. Returns array of Host.",
+      "method": "GET",
+      "path": "/query.lua",
+      "params": [
+        {
+          "name": "query",
+          "wire_name": "hosts",
+          "type": "string",
+          "location": "query",
+          "description": "FRITZ!OS data-path expression selecting the device fields to return"
+        }
+      ]
+    },
+    {
+      "name": "query_run",
+      "description": "Run an arbitrary FRITZ!OS data-path expression and print the raw JSON result. Required: result. Returns the QueryResult.",
+      "method": "GET",
+      "path": "/query.lua",
+      "params": [
+        {
+          "name": "result",
+          "type": "string",
+          "location": "query",
+          "description": "FRITZ!OS data-path expression, for example wlan:settings/ssid",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "tam_list",
+      "description": "List the configured answering machines and whether each is active. Optional: query. Returns array of Tam.",
+      "method": "GET",
+      "path": "/query.lua",
+      "params": [
+        {
+          "name": "query",
+          "wire_name": "tam",
+          "type": "string",
+          "location": "query",
+          "description": "Data-path expression selecting answering-machine fields"
+        }
+      ]
+    },
+    {
+      "name": "wlan_info",
+      "description": "Read the primary wireless network name and whether the access point is enabled. Optional: ssid (default: wlan:settings/ssid), enabled (default: wlan:settings/ap_enabled). Returns the WlanInfo.",
+      "method": "GET",
+      "path": "/query.lua",
+      "params": [
+        {
+          "name": "ssid",
+          "type": "string",
+          "location": "query",
+          "description": "Data-path expression for the network name"
+        },
+        {
+          "name": "enabled",
+          "type": "string",
+          "location": "query",
+          "description": "Data-path expression for the access-point enabled flag"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "enabledPlugins": {
+    "printing-press-bundle@filippo-skills": true,
+    "printing-press@filippo-skills": true,
+    "printing-press-polish@filippo-skills": true,
+    "printing-press-score@filippo-skills": true,
+    "printing-press-output-review@filippo-skills": true,
+    "agent-report-guard@filippo-skills": true,
+    "golang-pro@filippo-skills": true,
+    "cli-developer@filippo-skills": true,
+    "gopls-lsp@claude-plugins-official": true
+  }
+}

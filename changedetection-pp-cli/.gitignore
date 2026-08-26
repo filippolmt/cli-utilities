@@ -1,3 +1,4 @@
 config.toml
 /changedetection-pp-cli
 .cd-home/
+bin/

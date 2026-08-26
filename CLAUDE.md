@@ -35,8 +35,16 @@ wholesale. Extensions belong in their own files beside the generated ones —
 
 ## Env / config
 
-Secrets live in each CLI's `config.toml` (gitignored; only
-`config.toml.example` is committed). Env vars override the config file.
+Each CLI keeps its own credentials in its own directory. Nothing lives at the
+repo root.
+
+- `<cli>/config.toml` — gitignored; only `config.toml.example` is committed.
+- `<cli>/.env` — gitignored; only `.env.template` is committed. The CLIs read
+  environment variables, not this file, so load it first:
+  `set -a; . ./.env; set +a` (this needs `KEY=value`, not `KEY: value`).
+
+Env vars override the config file, and anything already exported in the shell
+overrides the `.env`.
 
 **changedetection-pp-cli**
 - `CHANGEDETECTION_API_KEY`

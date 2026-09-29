@@ -10,6 +10,7 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -398,18 +399,34 @@ through the web UI.`,
 			if refused, err := fbRefuseUnderHarness(cmd, flags, "remove the unused devices"); refused {
 				return err
 			}
-			if _, err := box.web.Data(ctx, "netDev", map[string]string{"xhrId": "cleanup", "useajax": "1"}); err != nil {
-				return fbErr(err)
+			// The UI's button submits an empty "cleanup" field; the router may
+			// answer "confirm", which the UI resubmits with "confirmed".
+			form := map[string]string{"cleanup": ""}
+			for attempt := 0; attempt < 2; attempt++ {
+				answer, err := box.web.Data(ctx, "netDev", form)
+				if err != nil {
+					return fbErr(err)
+				}
+				if status, _ := jsonPath(answer, "data", "cleanup"); string(status) != `"confirm"` {
+					break
+				}
+				form["confirmed"] = ""
 			}
-			// The cleanup reply carries no result, so the list is read again to
-			// report what actually went.
-			raw, err = box.web.Data(ctx, "netDev", netDevParams)
-			if err != nil {
-				return fbErr(err)
-			}
-			after, err := parseUnusedHosts(raw)
-			if err != nil {
-				return err
+			// The reply carries no result, and the router drops the devices a
+			// moment later, so the list is re-read until it shrinks.
+			var after []map[string]any
+			for attempt := 0; attempt < 5; attempt++ {
+				time.Sleep(time.Second)
+				raw, err = box.web.Data(ctx, "netDev", netDevParams)
+				if err != nil {
+					return fbErr(err)
+				}
+				if after, err = parseUnusedHosts(raw); err != nil {
+					return err
+				}
+				if len(after) < len(before) {
+					break
+				}
 			}
 			if len(before) > 0 && len(after) == len(before) {
 				return apiErr(fmt.Errorf("the router removed none of the %d unused devices; this firmware may not support the cleanup request", len(before)))

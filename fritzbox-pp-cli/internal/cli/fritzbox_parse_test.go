@@ -61,44 +61,21 @@ func TestLedRow(t *testing.T) {
 	}
 }
 
-func TestHandWrittenCommandsRejectStrayPositionalArgs(t *testing.T) {
+func TestCommandsRejectStrayPositionalArgs(t *testing.T) {
 	root := RootCmd()
-	// Generated parents (hosts, portmap, calls, log, wan, ...) are upstream's
-	// business; only the hand-written commands hung off them are checked.
-	generatedParents := map[string]bool{"hosts": true, "portmap": true, "calls": true, "log": true, "wan": true, "dect": true, "tam": true, "wlan": true}
 	var check func(*cobra.Command)
 	check = func(c *cobra.Command) {
 		for _, sub := range c.Commands() {
 			check(sub)
 		}
-		if !c.Runnable() {
-			return
-		}
-		if strings.Contains(c.Use, "<") {
-			return // takes positionals and validates them in RunE
+		if c == root || !c.Runnable() || strings.ContainsAny(c.Use, "<[") {
+			return // positionals, when taken, are validated in RunE
 		}
 		if c.Args == nil || c.Args(c, []string{"5"}) == nil {
 			t.Errorf("%s accepts a stray positional argument", c.CommandPath())
 		}
 	}
-	for _, top := range root.Commands() {
-		if generatedParents[top.Name()] {
-			for _, sub := range top.Commands() {
-				check(sub)
-			}
-			continue
-		}
-		if handWrittenTop[top.Name()] {
-			check(top)
-		}
-	}
-}
-
-// handWrittenTop lists the top-level commands this CLI adds by hand.
-var handWrittenTop = map[string]bool{
-	"wifi": true, "device": true, "tr064": true, "home": true, "vpn": true, "snapshot": true,
-	"metrics": true, "energy": true, "health": true, "mesh": true, "presence": true,
-	"actions": true, "dsl": true, "lan": true, "phonebook": true, "aha": true,
+	check(root)
 }
 
 func TestParsePortOverview(t *testing.T) {
@@ -141,5 +118,47 @@ func TestFbEmitLabelsDataSource(t *testing.T) {
 	}
 	if !strings.Contains(out, `"source":"local"`) && !strings.Contains(out, `"source": "local"`) {
 		t.Errorf("stored reads should be labelled local: %s", out)
+	}
+}
+
+func TestRedactSecrets(t *testing.T) {
+	var v any
+	if err := json.Unmarshal([]byte(`{"guestAccess":{"psk":"hunter2","ssid":"Ospiti","empty_psk":""},
+		"users":[{"name":"filippo","password":"x"}],"wg_public_key":"abc","wg_private_key":"def",
+		"wps_pin":12345670,"api_token":"t","pwd":"p","bypass":"on","knownWlanDevices":[1],
+		"field":{"name":"psk","value":"hunter3"},"other":{"name":"ssid","value":"Home"}}`), &v); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal(redactSecrets(v))
+	want := `{"api_token":"***","bypass":"on","field":{"name":"psk","value":"***"},` +
+		`"guestAccess":{"empty_psk":"","psk":"***","ssid":"Ospiti"},"knownWlanDevices":[1],` +
+		`"other":{"name":"ssid","value":"Home"},"pwd":"***","users":[{"name":"filippo","password":"***"}],` +
+		`"wg_private_key":"***","wg_public_key":"abc","wps_pin":"***"}`
+	if string(got) != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+}
+
+func TestParseUnusedHosts(t *testing.T) {
+	raw := json.RawMessage(`{"data":{"active":[{"name":"Mac"}],"passive":[
+		{"UID":"landevice1","name":"phone","mac":"02:00:00:00:00:01","options":{"deleteable":true},"ipv4":{"ip":"192.168.178.10"}},
+		{"UID":"landevice2","name":"printer","mac":"02:00:00:00:00:02","options":{"deleteable":false},"ipv4":{"ip":""}}
+	]}}`)
+	got, err := parseUnusedHosts(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []fbUnusedHost{
+		{UID: "landevice1", Name: "phone", MAC: "02:00:00:00:00:01", IP: "192.168.178.10", Deletable: true},
+		{UID: "landevice2", Name: "printer", MAC: "02:00:00:00:00:02", Deletable: false},
+	}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("got %+v", got)
+	}
+	// A device that went offline meanwhile (landevice3) must not hide that
+	// landevice1 went.
+	gone := goneHosts(got, []fbUnusedHost{{UID: "landevice2"}, {UID: "landevice3"}})
+	if len(gone) != 1 || gone[0].UID != "landevice1" {
+		t.Errorf("gone = %+v", gone)
 	}
 }

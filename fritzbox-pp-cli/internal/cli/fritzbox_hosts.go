@@ -10,6 +10,7 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -120,7 +121,7 @@ func init() {
 		}
 		for _, c := range []*cobra.Command{
 			newHostsGetCmd(flags), newHostsBlockCmd(flags, true), newHostsBlockCmd(flags, false),
-			newHostsProfilesCmd(flags), newHostsSetProfileCmd(flags),
+			newHostsProfilesCmd(flags), newHostsSetProfileCmd(flags), newHostsCleanupCmd(flags),
 		} {
 			fbAttach(parent, c)
 		}
@@ -354,4 +355,167 @@ func newHostsSetProfileCmd(flags *rootFlags) *cobra.Command {
 	cmd.Flags().StringVar(&profileID, "profile", "", "Access profile id from 'hosts profiles'")
 	cmd.Flags().BoolVar(&confirm, "confirm", false, "Actually apply the change instead of printing what would happen")
 	return cmd
+}
+
+// fbUnusedHost is one offline device on the web UI's network overview.
+type fbUnusedHost struct {
+	UID  string `json:"uid"`
+	Name string `json:"name"`
+	MAC  string `json:"mac"`
+	IP   string `json:"ip"`
+	// Deletable is the router's per-device delete flag. It does not predict
+	// what cleanup removes: devices with custom settings are kept anyway, and
+	// the page does not say which those are.
+	Deletable bool `json:"deletable"`
+}
+
+// unusedHosts reads the offline devices from the netDev page, which returns no
+// data unless its device lists are asked for with xhrId.
+func (b *fbBox) unusedHosts(ctx context.Context) ([]fbUnusedHost, error) {
+	raw, err := b.web.Data(ctx, "netDev", map[string]string{"xhrId": "all", "useajax": "1"})
+	if err != nil {
+		return nil, fbErr(err)
+	}
+	return parseUnusedHosts(raw)
+}
+
+const (
+	// cleanupSubmits covers the UI's flow: submit, then resubmit once with
+	// "confirmed" when the router answers "confirm".
+	cleanupSubmits = 2
+	// The router drops the devices shortly after answering, so the list is
+	// re-read a few times, one second apart, before concluding none went.
+	cleanupPolls        = 5
+	cleanupPollInterval = time.Second
+)
+
+func newHostsCleanupCmd(flags *rootFlags) *cobra.Command {
+	var confirm bool
+	cmd := &cobra.Command{
+		Use:   "cleanup",
+		Short: "Remove the offline devices from the router's device list",
+		Long: `Remove every device the router lists as unused, like the web UI's
+"remove unused connections" button. Devices with custom settings (a fixed IP,
+a profile) are kept by the router; removed devices that come back online simply
+reappear.
+
+Prints what would be removed unless --confirm is passed, and refuses while a
+verification harness is active. TR-064 has no action for this, so it goes
+through the web UI.`,
+		Example: "  fritzbox-pp-cli hosts cleanup --confirm",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			const action = "remove the unused devices from the device list"
+			if dryRunOK(flags) {
+				return fbDryRun(cmd, flags, action, nil)
+			}
+			ctx, cancel := boundCtx(cmd.Context(), flags)
+			defer cancel()
+			box, err := newBox(flags)
+			if err != nil {
+				return err
+			}
+			before, err := box.unusedHosts(ctx)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fbDryRun(cmd, flags, action+" (pass --confirm to actually do it)", map[string]any{
+					"candidates": before,
+					"note":       "the router keeps devices with custom settings (fixed IP, profile, VPN user); the list does not show which",
+				})
+			}
+			if refused, err := fbRefuseUnderHarness(cmd, flags, action); refused {
+				return err
+			}
+			if len(before) == 0 {
+				return fbEmitObject(cmd, flags, map[string]any{"removed": []fbUnusedHost{}, "kept": []fbUnusedHost{}})
+			}
+			// The UI's button submits an empty "cleanup" field and resubmits it
+			// with "confirmed" when the router answers "confirm".
+			form := map[string]string{"cleanup": ""}
+			for attempt := 1; ; attempt++ {
+				answer, err := box.web.Data(ctx, "netDev", form)
+				if err != nil {
+					return fbErr(err)
+				}
+				var status string
+				if raw, ok := jsonPath(answer, "data", "cleanup"); ok {
+					_ = json.Unmarshal(raw, &status)
+				}
+				if status != "confirm" {
+					break
+				}
+				if attempt == cleanupSubmits {
+					return apiErr(fmt.Errorf("the router kept asking to confirm the cleanup"))
+				}
+				form["confirmed"] = ""
+			}
+			var removed []fbUnusedHost
+			var after []fbUnusedHost
+			for poll := 0; poll < cleanupPolls && len(removed) == 0; poll++ {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(cleanupPollInterval):
+				}
+				if after, err = box.unusedHosts(ctx); err != nil {
+					return err
+				}
+				removed = goneHosts(before, after)
+			}
+			result := map[string]any{"removed": removed, "kept": after}
+			if len(removed) == 0 {
+				// Either every candidate carries custom settings or the firmware
+				// ignored the request; the page cannot tell the two apart.
+				result["removed"] = []fbUnusedHost{}
+				result["note"] = "the router removed nothing: the remaining devices carry custom settings, or this firmware ignores the cleanup request"
+			}
+			return fbEmitObject(cmd, flags, result)
+		},
+	}
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Actually remove the devices instead of listing them")
+	return cmd
+}
+
+// goneHosts returns the devices of want that no longer appear in have, matched
+// by UID so devices going on- or offline meanwhile do not skew the result.
+func goneHosts(want, have []fbUnusedHost) []fbUnusedHost {
+	present := make(map[string]bool, len(have))
+	for _, h := range have {
+		present[h.UID] = true
+	}
+	var gone []fbUnusedHost
+	for _, h := range want {
+		if !present[h.UID] {
+			gone = append(gone, h)
+		}
+	}
+	return gone
+}
+
+// parseUnusedHosts reads the offline ("passive") devices from the netDev page.
+func parseUnusedHosts(raw json.RawMessage) ([]fbUnusedHost, error) {
+	list, ok := jsonPath(raw, "data", "passive")
+	if !ok {
+		return nil, apiErr(fmt.Errorf("router returned no device list"))
+	}
+	var devices []struct {
+		UID     string `json:"UID"`
+		Name    string `json:"name"`
+		MAC     string `json:"mac"`
+		Options struct {
+			Deleteable bool `json:"deleteable"`
+		} `json:"options"`
+		IPv4 struct {
+			IP string `json:"ip"`
+		} `json:"ipv4"`
+	}
+	if err := json.Unmarshal(list, &devices); err != nil {
+		return nil, apiErr(fmt.Errorf("parsing the device list: %w", err))
+	}
+	hosts := make([]fbUnusedHost, 0, len(devices))
+	for _, d := range devices {
+		hosts = append(hosts, fbUnusedHost{UID: d.UID, Name: d.Name, MAC: d.MAC, IP: d.IPv4.IP, Deletable: d.Options.Deleteable})
+	}
+	return hosts, nil
 }

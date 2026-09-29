@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -38,23 +39,41 @@ func (b *fbBox) EnergyDrain(ctx context.Context) ([]energyDrain, error) {
 	if !ok {
 		return nil, apiErr(fmt.Errorf("router returned no power-monitor data"))
 	}
+	return parseEnergyDrain(list)
+}
+
+// parseEnergyDrain decodes the drain list. The WAN port arrives as an entry
+// with an empty name and only its port list, so an unnamed entry is labelled
+// with its port names.
+func parseEnergyDrain(list json.RawMessage) ([]energyDrain, error) {
 	var rows []struct {
 		Name     string          `json:"name"`
 		ActPerc  int             `json:"actPerc"`
 		CumPerc  int             `json:"cumPerc"`
 		Statuses json.RawMessage `json:"statuses"`
+		Lan      []struct {
+			Name string `json:"name"`
+		} `json:"lan"`
 	}
 	if err := json.Unmarshal(list, &rows); err != nil {
 		return nil, apiErr(fmt.Errorf("parsing the power monitor: %w", err))
 	}
 	out := make([]energyDrain, 0, len(rows))
 	for _, r := range rows {
+		name := r.Name
+		if name == "" {
+			ports := make([]string, 0, len(r.Lan))
+			for _, l := range r.Lan {
+				ports = append(ports, l.Name)
+			}
+			name = strings.Join(ports, ", ")
+		}
 		out = append(out, energyDrain{
-			Name: r.Name, ActPercent: r.ActPerc, CumPercent: r.CumPerc,
+			Name: name, ActPercent: r.ActPerc, CumPercent: r.CumPerc,
 			Status: flattenStatuses(r.Statuses),
 		})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ActPercent > out[j].ActPercent })
+	sort.SliceStable(out, func(i, j int) bool { return out[i].ActPercent > out[j].ActPercent })
 	return out, nil
 }
 

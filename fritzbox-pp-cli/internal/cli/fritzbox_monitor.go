@@ -221,23 +221,33 @@ to have applied a change.`,
 			if err != nil {
 				return err
 			}
-			raw, err := box.web.Data(ctx, "shareVpn", nil)
-			if err != nil {
-				// Older firmware serves the same data under a different page.
-				raw, err = box.web.Data(ctx, "sysStatus", nil)
+			// FRITZ!OS 7.5+ keeps WireGuard on its own page; shareVpn only lists
+			// IPSec connections there. Older firmware carries it on shareVpn or
+			// the status page, so the first page that yields a connection wins.
+			var rows []map[string]any
+			var lastErr error
+			for _, page := range []string{"shareWireguard", "shareVpn", "sysStatus"} {
+				raw, err := box.web.Data(ctx, page, nil)
 				if err != nil {
-					return err
+					lastErr = err
+					continue
+				}
+				payload, ok := jsonPath(raw, "data")
+				if !ok {
+					continue
+				}
+				var decoded any
+				if err := json.Unmarshal(payload, &decoded); err != nil {
+					lastErr = apiErr(fmt.Errorf("parsing the VPN information: %w", err))
+					continue
+				}
+				if rows = extractWireguardRows(decoded); len(rows) > 0 {
+					break
 				}
 			}
-			payload, ok := jsonPath(raw, "data")
-			if !ok {
-				return apiErr(fmt.Errorf("router returned no VPN information"))
+			if len(rows) == 0 && lastErr != nil {
+				return fbErr(lastErr)
 			}
-			var decoded any
-			if err := json.Unmarshal(payload, &decoded); err != nil {
-				return apiErr(fmt.Errorf("parsing the VPN information: %w", err))
-			}
-			rows := extractWireguardRows(decoded)
 			if name != "" {
 				filtered := make([]map[string]any, 0, len(rows))
 				for _, r := range rows {

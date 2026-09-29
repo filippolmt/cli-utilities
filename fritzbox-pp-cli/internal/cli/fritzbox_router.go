@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -186,34 +187,53 @@ func newDeviceLedCmd(flags *rootFlags) *cobra.Command {
 			if dryRunOK(flags) {
 				return fbDryRun(cmd, flags, "read or change the status LEDs", nil)
 			}
+			if write {
+				if refused, err := fbRefuseUnderHarness(cmd, flags, "change the status LEDs"); refused {
+					return err
+				}
+			}
 			ctx, cancel := boundCtx(cmd.Context(), flags)
 			defer cancel()
 			box, err := newBox(flags)
 			if err != nil {
 				return err
 			}
-			if !write {
-				out, err := box.Call(ctx, "UserInterface1", "X_AVM-DE_GetInfo", nil)
-				if err != nil {
-					return err
-				}
-				return fbEmitObject(cmd, flags, soapToRow(out))
+			// TR-064 has no LED action on current firmware (UserInterface1's
+			// X_AVM-DE_GetInfo/SetConfig are the firmware-update settings), so
+			// the LEDs are read and written through the web UI's led page.
+			raw, err := box.web.Data(ctx, "led", nil)
+			if err != nil {
+				return fbErr(err)
 			}
-			if refused, err := fbRefuseUnderHarness(cmd, flags, "change the status LEDs"); refused {
+			row, err := ledRow(raw)
+			if err != nil {
 				return err
 			}
-			args2 := map[string]string{}
+			if !write {
+				return fbEmitObject(cmd, flags, row)
+			}
+			// The page applies the whole form, so unchanged settings are sent
+			// back with their current values.
+			args2 := map[string]string{
+				"ledDisplay": fmt.Sprint(row["led_display"]),
+				"dimValue":   fmt.Sprint(row["brightness"]),
+				"envLight":   "0",
+				"apply":      "",
+			}
+			if row["ambient_light"] == true {
+				args2["envLight"] = "1"
+			}
 			if on {
-				args2["LEDDisplay"] = "0"
+				args2["ledDisplay"] = "0"
 			}
 			if off {
-				args2["LEDDisplay"] = "2"
+				args2["ledDisplay"] = "2"
 			}
 			if brightness > 0 {
-				args2["LEDBrightness"] = strconv.Itoa(brightness)
+				args2["dimValue"] = strconv.Itoa(brightness)
 			}
-			if _, err := box.Call(ctx, "UserInterface1", "X_AVM-DE_SetConfig", args2); err != nil {
-				return err
+			if _, err := box.web.Data(ctx, "led", args2); err != nil {
+				return fbErr(err)
 			}
 			return fbEmitObject(cmd, flags, map[string]any{"changed": true, "settings": args2})
 		},
@@ -222,6 +242,33 @@ func newDeviceLedCmd(flags *rootFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&off, "off", false, "Turn the status LEDs off")
 	cmd.Flags().IntVar(&brightness, "brightness", 0, "LED brightness from 1 (dim) to 3 (bright)")
 	return cmd
+}
+
+// ledRow decodes the led page's ledSettings. ledDisplay is 0 when the LEDs
+// are on and 2 when they are off; dimValue runs from 1 (dim) to 3 (bright).
+func ledRow(raw json.RawMessage) (map[string]any, error) {
+	settings, ok := jsonPath(raw, "data", "ledSettings")
+	if !ok {
+		return nil, apiErr(fmt.Errorf("router returned no LED settings"))
+	}
+	var led struct {
+		Display  string `json:"ledDisplay"`
+		DimValue string `json:"dimValue"`
+		CanDim   string `json:"canDim"`
+		HasEnv   string `json:"hasEnv"`
+		EnvLight string `json:"envLight"`
+	}
+	if err := json.Unmarshal(settings, &led); err != nil {
+		return nil, apiErr(fmt.Errorf("parsing the LED settings: %w", err))
+	}
+	return map[string]any{
+		"leds_on":           led.Display == "0",
+		"led_display":       led.Display,
+		"brightness":        led.DimValue,
+		"can_dim":           led.CanDim == "1",
+		"has_ambient_light": led.HasEnv == "1",
+		"ambient_light":     led.EnvLight == "1",
+	}, nil
 }
 
 func newDeviceKeylockCmd(flags *rootFlags) *cobra.Command {
@@ -349,6 +396,11 @@ func newWifiCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{Use: "wifi", Short: "Wireless networks: state, statistics, keys, and channels"}
 	cmd.AddCommand(newWifiListCmd(flags), newWifiStatusCmd(flags), newWifiOnCmd(flags), newWifiOffCmd(flags),
 		newWifiStatsCmd(flags), newWifiKeyCmd(flags), newWifiQRCmd(flags), newWifiChannelCmd(flags))
+	// The network is chosen with --band; a stray positional such as
+	// 'wifi status 5' would otherwise silently act on the 2.4 GHz default.
+	for _, sub := range cmd.Commands() {
+		sub.Args = cobra.NoArgs
+	}
 	return cmd
 }
 
@@ -503,8 +555,14 @@ func newWifiStatsCmd(flags *rootFlags) *cobra.Command {
 			}
 			row := map[string]any{"band": band}
 			if pkt, err := box.Call(ctx, svc, "GetPacketStatistics", nil); err == nil {
-				for k, v := range pkt {
-					row[strings.ToLower(k)] = v
+				// FRITZ!OS 7.x+ no longer counts Wi-Fi packets and answers 0/0
+				// even with clients attached; a pair of zeros is not a measurement.
+				if pkt["TotalPacketsSent"] == "0" && pkt["TotalPacketsReceived"] == "0" {
+					row["packet_counters"] = "not reported by this firmware"
+				} else {
+					for k, v := range pkt {
+						row[strings.ToLower(k)] = v
+					}
 				}
 			}
 			if assoc, err := box.Call(ctx, svc, "GetTotalAssociations", nil); err == nil {

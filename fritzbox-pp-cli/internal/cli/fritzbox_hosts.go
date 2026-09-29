@@ -5,6 +5,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"net"
 	"sort"
@@ -261,7 +262,7 @@ func newHostsProfilesCmd(flags *rootFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rows := parseProfileList(out["ProfileList"])
+			rows := parseProfileList(out["FilterProfileList"])
 			if len(rows) == 0 && len(out) > 0 {
 				// Firmware differences in the envelope shape should surface the
 				// raw payload rather than an empty, confident-looking table.
@@ -273,25 +274,27 @@ func newHostsProfilesCmd(flags *rootFlags) *cobra.Command {
 	return cmd
 }
 
-// parseProfileList decodes the semicolon-and-comma separated profile list
-// FRITZ!OS returns from GetFilterProfiles.
+// parseProfileList decodes the FilterProfileList XML document FRITZ!OS returns
+// from GetFilterProfiles. The built-in profiles carry an empty name, so the
+// profile type stands in for it.
 func parseProfileList(raw string) []map[string]any {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	var doc struct {
+		Profiles []struct {
+			ID   string `xml:"FilterProfileID"`
+			Name string `xml:"Name"`
+			Type string `xml:"FilterProfileType"`
+		} `xml:"FilterProfile"`
+	}
+	if err := xml.Unmarshal([]byte(strings.TrimSpace(raw)), &doc); err != nil {
 		return nil
 	}
-	var rows []map[string]any
-	for _, entry := range strings.Split(raw, ";") {
-		entry = strings.TrimSpace(entry)
-		if entry == "" {
-			continue
+	rows := make([]map[string]any, 0, len(doc.Profiles))
+	for _, p := range doc.Profiles {
+		name := p.Name
+		if name == "" {
+			name = p.Type
 		}
-		id, name, ok := strings.Cut(entry, ",")
-		if !ok {
-			rows = append(rows, map[string]any{"profile": entry})
-			continue
-		}
-		rows = append(rows, map[string]any{"id": strings.TrimSpace(id), "name": strings.TrimSpace(name)})
+		rows = append(rows, map[string]any{"id": p.ID, "name": name, "type": p.Type})
 	}
 	return rows
 }

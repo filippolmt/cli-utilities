@@ -120,7 +120,7 @@ func init() {
 		}
 		for _, c := range []*cobra.Command{
 			newHostsGetCmd(flags), newHostsBlockCmd(flags, true), newHostsBlockCmd(flags, false),
-			newHostsProfilesCmd(flags), newHostsSetProfileCmd(flags),
+			newHostsProfilesCmd(flags), newHostsSetProfileCmd(flags), newHostsCleanupCmd(flags),
 		} {
 			fbAttach(parent, c)
 		}
@@ -354,4 +354,98 @@ func newHostsSetProfileCmd(flags *rootFlags) *cobra.Command {
 	cmd.Flags().StringVar(&profileID, "profile", "", "Access profile id from 'hosts profiles'")
 	cmd.Flags().BoolVar(&confirm, "confirm", false, "Actually apply the change instead of printing what would happen")
 	return cmd
+}
+
+// netDevParams asks the web UI's netDev page for its device lists; without an
+// xhrId the page returns no data.
+var netDevParams = map[string]string{"xhrId": "all", "useajax": "1"}
+
+func newHostsCleanupCmd(flags *rootFlags) *cobra.Command {
+	var confirm bool
+	cmd := &cobra.Command{
+		Use:   "cleanup",
+		Short: "Remove the offline devices from the router's device list",
+		Long: `Remove every device the router lists as unused, like the web UI's
+"remove unused connections" button. Devices with custom settings (a fixed IP,
+a profile) are kept by the router; removed devices that come back online simply
+reappear.
+
+Prints what would be removed unless --confirm is passed, and refuses while a
+verification harness is active. TR-064 has no action for this, so it goes
+through the web UI.`,
+		Example: "  fritzbox-pp-cli hosts cleanup --confirm",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRunOK(flags) {
+				return fbDryRun(cmd, flags, "remove the unused devices from the device list", nil)
+			}
+			ctx, cancel := boundCtx(cmd.Context(), flags)
+			defer cancel()
+			box, err := newBox(flags)
+			if err != nil {
+				return err
+			}
+			raw, err := box.web.Data(ctx, "netDev", netDevParams)
+			if err != nil {
+				return fbErr(err)
+			}
+			before, err := parseUnusedHosts(raw)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fbEmit(cmd, flags, before, "No unused devices to remove.")
+			}
+			if refused, err := fbRefuseUnderHarness(cmd, flags, "remove the unused devices"); refused {
+				return err
+			}
+			if _, err := box.web.Data(ctx, "netDev", map[string]string{"xhrId": "cleanup", "useajax": "1"}); err != nil {
+				return fbErr(err)
+			}
+			// The cleanup reply carries no result, so the list is read again to
+			// report what actually went.
+			raw, err = box.web.Data(ctx, "netDev", netDevParams)
+			if err != nil {
+				return fbErr(err)
+			}
+			after, err := parseUnusedHosts(raw)
+			if err != nil {
+				return err
+			}
+			if len(before) > 0 && len(after) == len(before) {
+				return apiErr(fmt.Errorf("the router removed none of the %d unused devices; this firmware may not support the cleanup request", len(before)))
+			}
+			return fbEmitObject(cmd, flags, map[string]any{"removed": len(before) - len(after), "kept": after})
+		},
+	}
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Actually remove the devices instead of listing them")
+	return cmd
+}
+
+// parseUnusedHosts reads the offline ("passive") devices from the netDev page.
+func parseUnusedHosts(raw json.RawMessage) ([]map[string]any, error) {
+	list, ok := jsonPath(raw, "data", "passive")
+	if !ok {
+		return nil, apiErr(fmt.Errorf("router returned no device list"))
+	}
+	var devices []struct {
+		UID     string `json:"UID"`
+		Name    string `json:"name"`
+		MAC     string `json:"mac"`
+		Options struct {
+			Deleteable bool `json:"deleteable"`
+		} `json:"options"`
+		IPv4 struct {
+			IP string `json:"ip"`
+		} `json:"ipv4"`
+	}
+	if err := json.Unmarshal(list, &devices); err != nil {
+		return nil, apiErr(fmt.Errorf("parsing the device list: %w", err))
+	}
+	rows := make([]map[string]any, 0, len(devices))
+	for _, d := range devices {
+		rows = append(rows, map[string]any{
+			"uid": d.UID, "name": d.Name, "mac": d.MAC, "ip": d.IPv4.IP, "removable": d.Options.Deleteable,
+		})
+	}
+	return rows, nil
 }

@@ -98,7 +98,7 @@ func TestHandWrittenCommandsRejectStrayPositionalArgs(t *testing.T) {
 var handWrittenTop = map[string]bool{
 	"wifi": true, "device": true, "tr064": true, "home": true, "vpn": true, "snapshot": true,
 	"metrics": true, "energy": true, "health": true, "mesh": true, "presence": true,
-	"actions": true, "dsl": true, "lan": true, "phonebook": true, "aha": true,
+	"actions": true, "dsl": true, "lan": true, "phonebook": true, "aha": true, "web": true,
 }
 
 func TestParsePortOverview(t *testing.T) {
@@ -141,5 +141,32 @@ func TestFbEmitLabelsDataSource(t *testing.T) {
 	}
 	if !strings.Contains(out, `"source":"local"`) && !strings.Contains(out, `"source": "local"`) {
 		t.Errorf("stored reads should be labelled local: %s", out)
+	}
+}
+
+func TestRedactSecrets(t *testing.T) {
+	var v any
+	if err := json.Unmarshal([]byte(`{"guestAccess":{"psk":"hunter2","ssid":"Ospiti","empty_psk":""},
+		"users":[{"name":"filippo","password":"x"}],"wg_public_key":"abc","knownWlanDevices":[1]}`), &v); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal(redactSecrets(v))
+	want := `{"guestAccess":{"empty_psk":"","psk":"***","ssid":"Ospiti"},"knownWlanDevices":[1],"users":[{"name":"filippo","password":"***"}],"wg_public_key":"***"}`
+	if string(got) != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+}
+
+func TestParseUnusedHosts(t *testing.T) {
+	raw := json.RawMessage(`{"data":{"active":[{"name":"Mac"}],"passive":[
+		{"UID":"landevice1693","name":"iPhone","mac":"A2:5A:89:65:30:28","options":{"deleteable":true},"ipv4":{"ip":"192.168.178.31"}},
+		{"UID":"landevice9","name":"NAS","mac":"00:11:32:00:00:01","options":{"deleteable":false},"ipv4":{"ip":""}}
+	]}}`)
+	got, err := parseUnusedHosts(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0]["name"] != "iPhone" || got[0]["ip"] != "192.168.178.31" || got[0]["removable"] != true || got[1]["removable"] != false {
+		t.Fatalf("got %v", got)
 	}
 }

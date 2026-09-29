@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -280,11 +281,19 @@ func fbRefuseUnderHarness(cmd *cobra.Command, flags *rootFlags, action string) (
 	return true, nil
 }
 
-// fbEmit renders rows as machine output or as the generated human table.
+// fbEmit renders rows read from the router as machine output or as the
+// generated human table.
 func fbEmit(cmd *cobra.Command, flags *rootFlags, rows []map[string]any, empty string) error {
+	return fbEmitFrom(cmd, flags, "live", rows, empty)
+}
+
+// fbEmitFrom is fbEmit with an explicit --agent meta.source: "live" for data
+// just read from the router, "local" for data read from the store. The
+// generated printJSONFiltered always says "local".
+func fbEmitFrom(cmd *cobra.Command, flags *rootFlags, source string, rows []map[string]any, empty string) error {
 	out := cmd.OutOrStdout()
 	if !wantsHumanTable(out, flags) {
-		return printJSONFiltered(out, rows, flags)
+		return fbPrintJSON(out, rows, flags, source)
 	}
 	if len(rows) == 0 {
 		fmt.Fprintln(out, empty)
@@ -297,7 +306,7 @@ func fbEmit(cmd *cobra.Command, flags *rootFlags, rows []map[string]any, empty s
 func fbEmitObject(cmd *cobra.Command, flags *rootFlags, obj map[string]any) error {
 	out := cmd.OutOrStdout()
 	if !wantsHumanTable(out, flags) {
-		return printJSONFiltered(out, obj, flags)
+		return fbPrintJSON(out, obj, flags, "live")
 	}
 	keys := make([]string, 0, len(obj))
 	for k := range obj {
@@ -308,6 +317,15 @@ func fbEmitObject(cmd *cobra.Command, flags *rootFlags, obj map[string]any) erro
 		fmt.Fprintf(out, "%-28s %v\n", k, obj[k])
 	}
 	return nil
+}
+
+// fbPrintJSON is printJSONFiltered with the given --agent meta.source.
+func fbPrintJSON(w io.Writer, v any, flags *rootFlags, source string) error {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return printOutputWithFlagsMeta(w, raw, flags, map[string]any{"source": source})
 }
 
 // soapToRow converts SOAP output arguments into a stable ordered row.

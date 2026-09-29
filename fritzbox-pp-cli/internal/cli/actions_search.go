@@ -103,7 +103,7 @@ extensions, and works offline after the first run.`,
 					"call": fmt.Sprintf("fritzbox-pp-cli tr064 call %s %s", m.Service, m.Action),
 				})
 			}
-			return fbEmit(cmd, flags, rows, fmt.Sprintf("No TR-064 action matched %q on this firmware.", args[0]))
+			return fbEmitFrom(cmd, flags, "local", rows, fmt.Sprintf("No TR-064 action matched %q on this firmware.", args[0]))
 		},
 	}
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Re-read the catalog from the router before searching")

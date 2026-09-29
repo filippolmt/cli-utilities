@@ -26,7 +26,21 @@ func fbAttach(parent, cmd *cobra.Command) {
 			return
 		}
 	}
+	rejectStrayArgs(cmd)
 	parent.AddCommand(cmd)
+}
+
+// rejectStrayArgs makes every runnable command in the tree that does not name
+// a positional in its Use line (e.g. "get <device>") refuse positionals, so
+// 'wifi status 5' fails instead of silently acting on the --band default.
+// Commands that do take positionals validate them in RunE.
+func rejectStrayArgs(cmd *cobra.Command) {
+	if cmd.Args == nil && cmd.Runnable() && !strings.Contains(cmd.Use, "<") {
+		cmd.Args = cobra.NoArgs
+	}
+	for _, sub := range cmd.Commands() {
+		rejectStrayArgs(sub)
+	}
 }
 
 // fbFind resolves an existing command path so hand-authored subcommands can

@@ -181,7 +181,7 @@ reachability; use 'doctor' instead.`,
 
 			out := cmd.OutOrStdout()
 			if !wantsHumanTable(out, flags) {
-				if err := printJSONFiltered(out, view, flags); err != nil {
+				if err := fbPrintJSON(out, view, flags, "live"); err != nil {
 					return err
 				}
 			} else {

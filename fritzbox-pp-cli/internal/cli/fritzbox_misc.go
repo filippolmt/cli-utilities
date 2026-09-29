@@ -45,17 +45,21 @@ type fbPortMapping struct {
 	InternalHost string `json:"internal_host"`
 	InternalPort string `json:"internal_port"`
 	Enabled      bool   `json:"enabled"`
+	// Source is "tr064" for a rule in the TR-064 table (deletable by index),
+	// "upnp" for one a device opened itself, "exposed-host" for a DMZ host.
+	Source string `json:"source"`
 }
 
 func (p fbPortMapping) row() map[string]any {
 	return map[string]any{
 		"index": p.Index, "description": p.Description, "protocol": p.Protocol,
 		"external_port": p.ExternalPort, "internal_host": p.InternalHost,
-		"internal_port": p.InternalPort, "enabled": p.Enabled,
+		"internal_port": p.InternalPort, "enabled": p.Enabled, "source": p.Source,
 	}
 }
 
-// PortMappings walks the router's forwarding table.
+// PortMappings lists every open port: the TR-064 forwarding table plus the
+// per-device sharing and UPnP/PCP ports from the portoverview page.
 //
 // There is no list action: entries are read one index at a time until the
 // router reports the index is invalid, which is the documented way to
@@ -88,9 +92,69 @@ func (b *fbBox) PortMappings(ctx context.Context) ([]fbPortMapping, error) {
 			InternalHost: out["InternalClient"],
 			InternalPort: out["InternalPort"],
 			Enabled:      out["PortMappingEnabled"] == "1",
+			Source:       "tr064",
 		})
 	}
+	// FRITZ!OS 7+ keeps per-device sharing, including the ports devices open
+	// themselves over UPnP/PCP, outside the TR-064 table; only the web UI's
+	// portoverview page lists them. Firmware without the page answers with
+	// no device list, which yields just the TR-064 rules.
+	raw, err := b.web.Data(ctx, "portoverview", nil)
+	if err != nil {
+		return nil, fbErr(err)
+	}
+	mappings = append(mappings, parsePortOverview(raw)...)
 	return mappings, nil
+}
+
+// igdRuleKeys lists portoverview's per-device igdrules fields in output order.
+var igdRuleKeys = []struct{ key, protocol string }{
+	{"TCP_ipv4", "TCP"}, {"TCP_ipv6", "TCP (IPv6)"},
+	{"UDP_ipv4", "UDP"}, {"UDP_ipv6", "UDP (IPv6)"},
+	// GRP/GSE are further protocol groups the page does not document; they
+	// keep the router's own name rather than a guessed protocol.
+	{"GRP_ipv4", "GRP"}, {"GRP_ipv6", "GRP (IPv6)"},
+	{"GSE_ipv4", "GSE"}, {"GSE_ipv6", "GSE (IPv6)"},
+}
+
+// parsePortOverview turns the portoverview page into mappings: one per port a
+// device opened itself, and one for a device exposed as the DMZ host. Index is
+// -1 because none of them live in the TR-064 table 'portmap delete' walks.
+func parsePortOverview(raw json.RawMessage) []fbPortMapping {
+	list, ok := jsonPath(raw, "data", "devices")
+	if !ok {
+		return nil
+	}
+	var devices []struct {
+		Name     string            `json:"devicename"`
+		IP       string            `json:"localIpv4"`
+		Exposed  bool              `json:"exposed_ipv4"`
+		IGDRules map[string]string `json:"igdrules"`
+	}
+	if err := json.Unmarshal(list, &devices); err != nil {
+		return nil
+	}
+	var out []fbPortMapping
+	for _, d := range devices {
+		for _, k := range igdRuleKeys {
+			for _, port := range strings.Split(d.IGDRules[k.key], ",") {
+				if port = strings.TrimSpace(port); port == "" {
+					continue
+				}
+				out = append(out, fbPortMapping{
+					Index: -1, Description: d.Name + " (UPnP/PCP)", Protocol: k.protocol,
+					ExternalPort: port, InternalHost: d.IP, Enabled: true, Source: "upnp",
+				})
+			}
+		}
+		if d.Exposed {
+			out = append(out, fbPortMapping{
+				Index: -1, Description: d.Name + " (exposed host)", Protocol: "ALL",
+				ExternalPort: "*", InternalHost: d.IP, Enabled: true, Source: "exposed-host",
+			})
+		}
+	}
+	return out
 }
 
 func newPortmapListCmd(flags *rootFlags) *cobra.Command {
@@ -655,7 +719,7 @@ rather than leaving it running.`,
 						"name": m.name, "type": m.kind, "help": m.help, "value": m.value,
 					})
 				}
-				return printJSONFiltered(out, rows, flags)
+				return fbPrintJSON(out, rows, flags, "live")
 			}
 			for _, m := range metrics {
 				fmt.Fprintf(out, "# HELP %s %s\n# TYPE %s %s\n%s %g\n", m.name, m.help, m.name, m.kind, m.name, m.value)

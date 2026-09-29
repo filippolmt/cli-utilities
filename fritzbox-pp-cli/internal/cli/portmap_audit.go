@@ -22,6 +22,7 @@ type portmapAuditRow struct {
 	InternalHost string `json:"internal_host"`
 	InternalPort string `json:"internal_port"`
 	Enabled      bool   `json:"enabled"`
+	Source       string `json:"source"`
 	Verdict      string `json:"verdict"`
 	Reason       string `json:"reason,omitempty"`
 }
@@ -71,7 +72,7 @@ checking after any network cleanup.`,
 				row := portmapAuditRow{
 					Index: m.Index, Description: m.Description, Protocol: m.Protocol,
 					ExternalPort: m.ExternalPort, InternalHost: m.InternalHost,
-					InternalPort: m.InternalPort, Enabled: m.Enabled,
+					InternalPort: m.InternalPort, Enabled: m.Enabled, Source: m.Source,
 				}
 				host, known := byIP[m.InternalHost]
 				switch {
@@ -94,7 +95,7 @@ checking after any network cleanup.`,
 
 			out := cmd.OutOrStdout()
 			if !wantsHumanTable(out, flags) {
-				return printJSONFiltered(out, rows, flags)
+				return fbPrintJSON(out, rows, flags, "live")
 			}
 			if len(mappings) == 0 {
 				fmt.Fprintln(out, "No port forwarding rules are configured.")

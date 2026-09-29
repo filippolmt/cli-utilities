@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,8 @@ TR-064 does not expose: DNS servers (dnsSrv), port sharing (portoverview),
 WireGuard (shareWireguard), channels (chan), LEDs (led), network (netSet).
 
 Read-only: no form values are sent, so nothing is applied. An unknown page
-name returns the overview page instead of an error. Passwords, pre-shared
+name returns the overview page instead of an error, and a few pages load their
+data only on request and come back empty here (netDev: use 'hosts cleanup'). Passwords, pre-shared
 keys and other secrets are masked unless --reveal is passed.`,
 		Example:     "  fritzbox-pp-cli web page dnsSrv --agent",
 		Annotations: map[string]string{"mcp:read-only": "true", "pp:happy-args": "name=dnsSrv"},
@@ -72,16 +74,28 @@ keys and other secrets are masked unless --reveal is passed.`,
 }
 
 // secretKey matches field names that carry credentials in FRITZ!OS pages.
+// Public keys are not secret and stay visible (see isSecretKey).
 // ponytail: name heuristic, so a secret under an unusual key name slips
 // through; extend the pattern when one shows up.
-var secretKey = regexp.MustCompile(`(?i)(psk|pass|secret|key$|^pin$)`)
+var secretKey = regexp.MustCompile(`(?i)(psk|passw|passphrase|^pass$|_pass$|secret|token|pwd|pin$|(^|_)key$|privatekey)`)
 
-// redactSecrets masks every non-empty string stored under a secret-looking key.
+func isSecretKey(k string) bool {
+	return secretKey.MatchString(k) && !strings.Contains(strings.ToLower(k), "public")
+}
+
+// redactSecrets masks every non-empty scalar stored under a secret-looking
+// key, and the value of {"name": <secret-looking>, "value": ...} pairs, the
+// shape FRITZ!OS form pages use.
 func redactSecrets(v any) any {
 	switch t := v.(type) {
 	case map[string]any:
+		if name, ok := t["name"].(string); ok && isSecretKey(name) {
+			if _, ok := t["value"]; ok && !isEmptyScalar(t["value"]) {
+				t["value"] = "***"
+			}
+		}
 		for k, val := range t {
-			if s, ok := val.(string); ok && s != "" && secretKey.MatchString(k) {
+			if isSecretKey(k) && !isEmptyScalar(val) && !isContainer(val) {
 				t[k] = "***"
 				continue
 			}
@@ -93,4 +107,16 @@ func redactSecrets(v any) any {
 		}
 	}
 	return v
+}
+
+func isContainer(v any) bool {
+	switch v.(type) {
+	case map[string]any, []any:
+		return true
+	}
+	return false
+}
+
+func isEmptyScalar(v any) bool {
+	return v == nil || v == ""
 }

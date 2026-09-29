@@ -396,11 +396,6 @@ func newWifiCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{Use: "wifi", Short: "Wireless networks: state, statistics, keys, and channels"}
 	cmd.AddCommand(newWifiListCmd(flags), newWifiStatusCmd(flags), newWifiOnCmd(flags), newWifiOffCmd(flags),
 		newWifiStatsCmd(flags), newWifiKeyCmd(flags), newWifiQRCmd(flags), newWifiChannelCmd(flags))
-	// The network is chosen with --band; a stray positional such as
-	// 'wifi status 5' would otherwise silently act on the 2.4 GHz default.
-	for _, sub := range cmd.Commands() {
-		sub.Args = cobra.NoArgs
-	}
 	return cmd
 }
 
@@ -685,7 +680,7 @@ makes it scannable. Do not paste the output into a shared channel.
 			}
 			out := cmd.OutOrStdout()
 			if !wantsHumanTable(out, flags) {
-				return printJSONFiltered(out, map[string]any{"ssid": info["SSID"], "payload": payload}, flags)
+				return fbPrintJSON(out, map[string]any{"ssid": info["SSID"], "payload": payload}, flags, "live")
 			}
 			fmt.Fprintf(out, "%s\n\n", payload)
 			return renderQR(out, payload)

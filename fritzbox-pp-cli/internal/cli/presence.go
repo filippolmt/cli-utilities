@@ -156,7 +156,7 @@ Use this command for who is home. Do NOT use it for a raw device inventory; use
 
 			out := cmd.OutOrStdout()
 			if !wantsHumanTable(out, flags) {
-				return printJSONFiltered(out, rows, flags)
+				return fbPrintJSON(out, rows, flags, "live")
 			}
 			for _, r := range rows {
 				state := "away"

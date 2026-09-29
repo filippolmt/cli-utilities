@@ -16,6 +16,13 @@ func init() {
 			"calls":   {newNovelCallsDigestCmd(flags), newNovelCallsUnknownCmd(flags)},
 			"portmap": {newNovelPortmapAuditCmd(flags)},
 		}
+		// The generated tree adds these novel commands itself (so fbAttach
+		// skips them), which leaves them outside fbAttach's argument policy.
+		for _, path := range [][]string{{"energy"}, {"health"}, {"mesh"}, {"presence"}, {"actions"}, {"hosts", "diff"}} {
+			if cmd := fbFind(root, path...); cmd != nil {
+				rejectStrayArgs(cmd)
+			}
+		}
 		for parentName, children := range attachTo {
 			parent := fbFind(root, parentName)
 			if parent == nil {

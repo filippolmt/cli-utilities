@@ -2,7 +2,10 @@ package cli
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestParseProfileListXML(t *testing.T) {
@@ -58,15 +61,85 @@ func TestLedRow(t *testing.T) {
 	}
 }
 
-func TestWifiBandCommandsRejectPositionalArgs(t *testing.T) {
-	wifi := newWifiCmd(&rootFlags{})
-	for _, sub := range wifi.Commands() {
-		if sub.Args == nil {
-			t.Errorf("wifi %s accepts positional arguments silently", sub.Name())
+func TestHandWrittenCommandsRejectStrayPositionalArgs(t *testing.T) {
+	root := RootCmd()
+	// Generated parents (hosts, portmap, calls, log, wan, ...) are upstream's
+	// business; only the hand-written commands hung off them are checked.
+	generatedParents := map[string]bool{"hosts": true, "portmap": true, "calls": true, "log": true, "wan": true, "dect": true, "tam": true, "wlan": true}
+	var check func(*cobra.Command)
+	check = func(c *cobra.Command) {
+		for _, sub := range c.Commands() {
+			check(sub)
+		}
+		if !c.Runnable() {
+			return
+		}
+		if strings.Contains(c.Use, "<") {
+			return // takes positionals and validates them in RunE
+		}
+		if c.Args == nil || c.Args(c, []string{"5"}) == nil {
+			t.Errorf("%s accepts a stray positional argument", c.CommandPath())
+		}
+	}
+	for _, top := range root.Commands() {
+		if generatedParents[top.Name()] {
+			for _, sub := range top.Commands() {
+				check(sub)
+			}
 			continue
 		}
-		if err := sub.Args(sub, []string{"5"}); err == nil {
-			t.Errorf("wifi %s accepted a positional argument", sub.Name())
+		if handWrittenTop[top.Name()] {
+			check(top)
 		}
+	}
+}
+
+// handWrittenTop lists the top-level commands this CLI adds by hand.
+var handWrittenTop = map[string]bool{
+	"wifi": true, "device": true, "tr064": true, "home": true, "vpn": true, "snapshot": true,
+	"metrics": true, "energy": true, "health": true, "mesh": true, "presence": true,
+	"actions": true, "dsl": true, "lan": true, "phonebook": true, "aha": true,
+}
+
+func TestParsePortOverview(t *testing.T) {
+	raw := json.RawMessage(`{"data":{"devices":[
+		{"devicename":"sy","localIpv4":"192.168.178.150","exposed_ipv4":false,
+		 "igdrules":{"UDP_ipv4":"6881","TCP_ipv4":"16881, 62198","TCP_ipv6":"","GRP_ipv4":""}},
+		{"devicename":"dmz","localIpv4":"192.168.178.9","exposed_ipv4":true,"igdrules":{}}
+	]}}`)
+	got := parsePortOverview(raw)
+	want := []fbPortMapping{
+		{Index: -1, Description: "sy (UPnP/PCP)", Protocol: "TCP", ExternalPort: "16881", InternalHost: "192.168.178.150", Enabled: true, Source: "upnp"},
+		{Index: -1, Description: "sy (UPnP/PCP)", Protocol: "TCP", ExternalPort: "62198", InternalHost: "192.168.178.150", Enabled: true, Source: "upnp"},
+		{Index: -1, Description: "sy (UPnP/PCP)", Protocol: "UDP", ExternalPort: "6881", InternalHost: "192.168.178.150", Enabled: true, Source: "upnp"},
+		{Index: -1, Description: "dmz (exposed host)", Protocol: "ALL", ExternalPort: "*", InternalHost: "192.168.178.9", Enabled: true, Source: "exposed-host"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d mappings, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("mapping %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestFbEmitLabelsDataSource(t *testing.T) {
+	flags := &rootFlags{agent: true, asJSON: true}
+	var buf strings.Builder
+	cmd := &cobra.Command{}
+	cmd.SetOut(&buf)
+	if err := fbEmitObject(cmd, flags, map[string]any{"a": 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := fbEmitFrom(cmd, flags, "local", []map[string]any{{"a": 1}}, ""); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"source":"live"`) && !strings.Contains(out, `"source": "live"`) {
+		t.Errorf("router reads should be labelled live: %s", out)
+	}
+	if !strings.Contains(out, `"source":"local"`) && !strings.Contains(out, `"source": "local"`) {
+		t.Errorf("stored reads should be labelled local: %s", out)
 	}
 }

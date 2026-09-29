@@ -752,9 +752,9 @@ real units, which this command deliberately does not.`,
 			}
 			out := cmd.OutOrStdout()
 			if !wantsHumanTable(out, flags) {
-				return printJSONFiltered(out, map[string]any{
+				return fbPrintJSON(out, map[string]any{
 					"switchcmd": args[0], "response": strings.TrimSpace(string(body)),
-				}, flags)
+				}, flags, "live")
 			}
 			fmt.Fprintln(out, strings.TrimSpace(string(body)))
 			return nil

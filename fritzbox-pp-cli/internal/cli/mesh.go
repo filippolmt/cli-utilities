@@ -113,7 +113,7 @@ single status call reports.`,
 
 			out := cmd.OutOrStdout()
 			if !wantsHumanTable(out, flags) {
-				return printJSONFiltered(out, roots, flags)
+				return fbPrintJSON(out, roots, flags, "live")
 			}
 			if len(roots) == 0 {
 				fmt.Fprintln(out, "The router reported no topology.")

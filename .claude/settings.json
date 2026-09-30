@@ -8,6 +8,7 @@
     "agent-report-guard@filippo-skills": true,
     "golang-pro@filippo-skills": true,
     "cli-developer@filippo-skills": true,
-    "gopls-lsp@claude-plugins-official": true
+    "gopls-lsp@claude-plugins-official": true,
+    "printing-press-reprint@filippo-skills": true
   }
 }

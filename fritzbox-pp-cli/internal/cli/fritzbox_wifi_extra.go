@@ -103,9 +103,10 @@ Changing channel briefly drops every client on that radio.`,
 					return err
 				}
 				return fbEmitObject(cmd, flags, map[string]any{
-					"band":              band,
-					"channel":           out["Channel"],
-					"possible_channels": out["PossibleChannels"],
+					"band":                 band,
+					"channel":              out["Channel"],
+					"auto_channel_enabled": out["X_AVM-DE_AutoChannelEnabled"] == "1",
+					"possible_channels":    out["PossibleChannels"],
 				})
 			}
 			if !confirm {

@@ -1,0 +1,15 @@
+{
+  "packages": [
+    {
+      "source": "git:github.com/filippolmt/skills",
+      "autoload": false,
+      "extensions": [],
+      "skills": [
+        "+skills/printing-press-polish",
+        "+skills/printing-press-output-review"
+      ],
+      "prompts": [],
+      "themes": []
+    }
+  ]
+}

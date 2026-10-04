@@ -117,7 +117,7 @@ func newWatchAddCmd(flags *rootFlags) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("opening local store: %w", err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			w := store.SubitoWatch{Name: args[0], Params: params, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
 			if err := db.SaveSubitoWatch(ctx, w); err != nil {
 				return err
@@ -167,7 +167,7 @@ func newWatchListCmd(flags *rootFlags) *cobra.Command {
 				return fmt.Errorf("opening local store: %w", err)
 			}
 			if db != nil {
-				defer db.Close()
+				defer func() { _ = db.Close() }()
 				if watches, err = db.SubitoWatches(ctx, ""); err != nil {
 					return err
 				}
@@ -222,7 +222,7 @@ func newWatchRmCmd(flags *rootFlags) *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("opening local store: %w", err)
 				}
-				defer db.Close()
+				defer func() { _ = db.Close() }()
 				if removed, err = db.DeleteSubitoWatch(ctx, args[0]); err != nil {
 					return err
 				}
@@ -289,7 +289,7 @@ nothing, unless --include-existing. Exit codes: 5 when any watch failed
 			if err != nil {
 				return fmt.Errorf("opening local store: %w", err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			watches, err := db.SubitoWatches(ctx, name)
 			if err != nil {
 				return err

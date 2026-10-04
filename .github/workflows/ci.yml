@@ -34,9 +34,12 @@ jobs:
         working-directory: ${{ matrix.dir }}
     steps:
       - uses: actions/checkout@v7
+      # Latest stable Go, as a local build would use: the go directive is a
+      # minimum, and pinning its exact patch release would test (and
+      # govulncheck) a standard library with already-fixed advisories.
       - uses: actions/setup-go@v7
         with:
-          go-version-file: ${{ matrix.dir }}/go.mod
+          go-version: stable
           cache-dependency-path: ${{ matrix.dir }}/go.sum
       - name: gofmt
         run: |
@@ -47,14 +50,12 @@ jobs:
       - run: go test -count=1 ./...
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
-  # The generated trees carry 100+ pre-existing findings each, so lint gates
-  # only what a change introduces.
+  # Lint gates only lines a change introduces, computed by git rather than
+  # the PR-diff API (which refuses diffs over 20,000 lines, e.g. a new CLI).
+  # Generated files are excluded by each module's .golangci.yml.
   lint:
     needs: modules
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
     strategy:
       fail-fast: false
       matrix:
@@ -63,12 +64,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # Latest stable Go, as a local build would use: the go directive is a
+      # minimum, and pinning its exact patch release would test (and
+      # govulncheck) a standard library with already-fixed advisories.
       - uses: actions/setup-go@v7
         with:
-          go-version-file: ${{ matrix.dir }}/go.mod
+          go-version: stable
           cache-dependency-path: ${{ matrix.dir }}/go.sum
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14.0
           working-directory: ${{ matrix.dir }}
-          only-new-issues: true
+          args: ${{ github.event_name == 'pull_request' && format('--new-from-merge-base=origin/{0}', github.base_ref) || format('--new-from-rev={0}', github.event.before) }}

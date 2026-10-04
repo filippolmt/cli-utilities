@@ -74,7 +74,7 @@ dropped, cross-posts merged. Add --per-m2 for real estate.`, "\n"),
 			}
 			db := openStoreOrWarn(cmd)
 			if db != nil {
-				defer db.Close()
+				defer func() { _ = db.Close() }()
 			}
 			run, err := collectComps(ctx, cmd, c, db, &o)
 			if err != nil {

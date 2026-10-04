@@ -97,7 +97,7 @@ Every listing seen is recorded locally for 'ads history' and 'ads risk'.`, "\n")
 			}
 			db := openStoreOrWarn(cmd)
 			if db != nil {
-				defer db.Close()
+				defer func() { _ = db.Close() }()
 			}
 			run, err := collectComps(ctx, cmd, c, db, &o)
 			if err != nil {

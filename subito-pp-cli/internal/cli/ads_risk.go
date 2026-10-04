@@ -85,7 +85,7 @@ change it); the seller check only knows ads this CLI has already seen.`, "\n"),
 			}
 			db := openStoreOrWarn(cmd)
 			if db != nil {
-				defer db.Close()
+				defer func() { _ = db.Close() }()
 			}
 			ad, source, err := loadAd(ctx, cmd, flags, c, db, ref)
 			if err != nil {

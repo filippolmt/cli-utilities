@@ -1,6 +1,21 @@
 version: "2"
 
 linters:
+  exclusions:
+    # Skip files with a "DO NOT EDIT" header and the generator-reserved
+    # packages: the generator owns them, and a reprint overwrites fixes.
+    generated: lax
+    paths:
+      - internal/cliutil/
+      - internal/platform/
+  settings:
+    errcheck:
+      # Command output goes to the terminal or a pipe; a failed write there
+      # has no recovery worth an error branch.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
   enable:
     - errorlint
     - govet

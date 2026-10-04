@@ -88,7 +88,7 @@ what similar items are offered at, not what they sold for.`, "\n"),
 			}
 			db := openStoreOrWarn(cmd)
 			if db != nil {
-				defer db.Close()
+				defer func() { _ = db.Close() }()
 			}
 			run, err := collectComps(ctx, cmd, c, db, &o)
 			if err != nil {

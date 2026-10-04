@@ -97,7 +97,7 @@ repost is another listing by the same seller with the same normalized title.`, "
 			if err != nil {
 				return fmt.Errorf("opening local store: %w", err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			// History is cumulative, so only the never-recorded case gets a
 			// hint; a stale-age hint would point at a sync that cannot help.
 			hintIfUnsynced(cmd, db, listingsResource)

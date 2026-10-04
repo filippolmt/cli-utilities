@@ -245,9 +245,7 @@ func Accessory(title string, queryTokens []string) bool {
 	if len(queryTokens) == 0 {
 		return false
 	}
-	if strings.Contains(title, " + ") {
-		title = strings.Replace(title, " + ", " con ", 1)
-	}
+	title = strings.Replace(title, " + ", " con ", 1)
 	ws := words(title)
 	bundled := false
 	for i, w := range ws {

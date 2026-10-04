@@ -59,7 +59,7 @@ func (s *Store) RecordSubitoListings(ctx context.Context, listings []SubitoListi
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }() // a no-op after Commit
 	added := 0
 	for _, l := range listings {
 		var lastPrice sql.NullFloat64
@@ -122,7 +122,7 @@ func (s *Store) SubitoObservations(ctx context.Context, listID string) ([]Subito
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]SubitoObservation, 0)
 	for rows.Next() {
 		var o SubitoObservation
@@ -140,7 +140,7 @@ func (s *Store) SubitoSellerListings(ctx context.Context, userID, exceptListID s
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]SubitoListing, 0)
 	for rows.Next() {
 		l := SubitoListing{UserID: userID}
@@ -179,7 +179,7 @@ func (s *Store) SubitoWatches(ctx context.Context, name string) ([]SubitoWatch, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]SubitoWatch, 0)
 	for rows.Next() {
 		var w SubitoWatch
@@ -203,7 +203,7 @@ func (s *Store) DeleteSubitoWatch(ctx context.Context, name string) (bool, error
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }() // a no-op after Commit
 	res, err := tx.ExecContext(ctx, `DELETE FROM subito_watches WHERE name = ?`, name)
 	if err != nil {
 		return false, err
@@ -222,7 +222,7 @@ func (s *Store) SubitoWatchSeenSet(ctx context.Context, watch string) (map[strin
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := map[string]sql.NullFloat64{}
 	for rows.Next() {
 		var id string
@@ -244,7 +244,7 @@ func (s *Store) MarkSubitoWatchSeen(ctx context.Context, watch string, prices ma
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }() // a no-op after Commit
 	for id, p := range prices {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO subito_watch_seen (watch, list_id, price, first_seen) VALUES (?, ?, ?, ?)
 			ON CONFLICT(watch, list_id) DO UPDATE SET price = excluded.price`, watch, id, p, stamp); err != nil {

@@ -51,7 +51,7 @@ func fetchAdPage(ctx context.Context, flags *rootFlags, url string) (subito.Deta
 	if err != nil {
 		return subito.Detail{}, fmt.Errorf("fetching %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	switch {
 	case resp.StatusCode == http.StatusGone || resp.StatusCode == http.StatusNotFound:
 		return subito.Detail{}, notFoundErr(fmt.Errorf("%s: listing removed or expired (HTTP %d)", url, resp.StatusCode))

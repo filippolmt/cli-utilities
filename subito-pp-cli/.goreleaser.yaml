@@ -1,0 +1,55 @@
+version: 2
+project_name: subito-pp-cli
+changelog:
+  disable: true
+builds:
+  - id: subito-pp-cli
+    main: ./cmd/subito-pp-cli
+    binary: subito-pp-cli
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X subito-pp-cli/internal/cli.version={{ .Version }}
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - windows_arm64
+  - id: subito-pp-mcp
+    main: ./cmd/subito-pp-mcp
+    binary: subito-pp-mcp
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - windows_arm64
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+checksum:
+  name_template: checksums.txt
+brews:
+  - name: subito-pp-cli
+    repository:
+      owner: filippolmt
+      name: homebrew-tap
+    homepage: "https://github.com/filippolmt/subito-pp-cli"
+    description: "Search Subito.it without a browser, rank ads against the real market, and watch for new listings from cron."
+    install: |
+      bin.install "subito-pp-cli"
+      bin.install "subito-pp-mcp"

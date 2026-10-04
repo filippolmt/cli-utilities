@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Every top-level directory with a go.mod is a CLI module; new CLIs are
+  # picked up without editing this file.
+  modules:
+    runs-on: ubuntu-latest
+    outputs:
+      dirs: ${{ steps.find.outputs.dirs }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: find
+        run: |
+          dirs=$(for f in ./*/go.mod; do d=${f%/go.mod}; printf '%s\n' "${d#./}"; done | jq -Rsc 'split("\n") | map(select(. != ""))')
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: modules
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.modules.outputs.dirs) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v7
+      # Latest stable Go, as a local build would use: the go directive is a
+      # minimum, and pinning its exact patch release would test (and
+      # govulncheck) a standard library with already-fixed advisories.
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache-dependency-path: ${{ matrix.dir }}/go.sum
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "$unformatted"; exit 1; fi
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test -count=1 ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # Generated files and generator-reserved packages are excluded by each
+  # module's .golangci.yml; everything else must be lint-clean.
+  lint:
+    needs: modules
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.modules.outputs.dirs) }}
+    steps:
+      - uses: actions/checkout@v7
+      # Latest stable Go, as a local build would use: the go directive is a
+      # minimum, and pinning its exact patch release would test (and
+      # govulncheck) a standard library with already-fixed advisories.
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache-dependency-path: ${{ matrix.dir }}/go.sum
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          working-directory: ${{ matrix.dir }}

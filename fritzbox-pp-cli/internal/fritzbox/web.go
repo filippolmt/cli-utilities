@@ -5,6 +5,7 @@ package fritzbox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -138,7 +139,7 @@ func (w *Web) withSession(ctx context.Context, build func(sid string) (*http.Req
 	if err == nil {
 		return raw, nil
 	}
-	if err != ErrSessionExpired {
+	if !errors.Is(err, ErrSessionExpired) {
 		return nil, err
 	}
 	sid, err = w.session.Refresh(ctx)
@@ -146,7 +147,7 @@ func (w *Web) withSession(ctx context.Context, build func(sid string) (*http.Req
 		return nil, err
 	}
 	raw, err = w.roundTrip(ctx, build, sid)
-	if err == ErrSessionExpired {
+	if errors.Is(err, ErrSessionExpired) {
 		return nil, fmt.Errorf("router rejected a freshly minted session id; check that the account has the required rights")
 	}
 	return raw, err

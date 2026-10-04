@@ -8,6 +8,7 @@
 package cli
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -119,37 +120,15 @@ WHERE fb_log_fts MATCH ? AND e.logged_at >= ?`
 				query += " LIMIT ?"
 				params = append(params, limit)
 			}
-			rows, err := db.DB().QueryContext(ctx, query, params...)
+			rows, err := queryLogEntries(ctx, db.DB(), query, params, args[0], category, cutoff, limit)
 			if err != nil {
-				// FTS5 is an optional SQLite module and its virtual table can
-				// fail to construct on a database whose shadow tables were
-				// written by a different build. Falling back to a scan keeps
-				// the command working; the base table is the source of truth
-				// either way, so only ranking is lost.
-				fallback := `
-SELECT e.logged_at, e.category, e.message
-FROM fb_log_entries e
-WHERE e.message LIKE ? AND e.logged_at >= ?`
-				fallbackParams := []any{"%" + args[0] + "%", cutoff}
-				if category != "" {
-					fallback += " AND e.category = ?"
-					fallbackParams = append(fallbackParams, category)
-				}
-				fallback += " ORDER BY e.logged_at DESC"
-				if limit > 0 {
-					fallback += " LIMIT ?"
-					fallbackParams = append(fallbackParams, limit)
-				}
-				rows, err = db.DB().QueryContext(ctx, fallback, fallbackParams...)
-				if err != nil {
-					return fmt.Errorf("searching the retained log: %w", err)
-				}
+				return err
 			}
+			defer func() { _ = rows.Close() }()
 			for rows.Next() {
 				var at sql.NullInt64
 				var cat, msg sql.NullString
 				if err := rows.Scan(&at, &cat, &msg); err != nil {
-					_ = rows.Close()
 					return fmt.Errorf("reading a log row: %w", err)
 				}
 				stamp := ""
@@ -159,7 +138,6 @@ WHERE e.message LIKE ? AND e.logged_at >= ?`
 				results = append(results, logSearchRow{At: stamp, Category: cat.String, Message: msg.String})
 			}
 			if err := rows.Err(); err != nil {
-				_ = rows.Close()
 				return fmt.Errorf("iterating log rows: %w", err)
 			}
 			if err := rows.Close(); err != nil {
@@ -185,6 +163,38 @@ WHERE e.message LIKE ? AND e.logged_at >= ?`
 	cmd.Flags().StringVar(&category, "category", "", "Only search entries in this category, for example sys, wlan, or fon")
 	cmd.Flags().StringVar(&dbPath, "db", "", "Database path")
 	return cmd
+}
+
+// queryLogEntries runs the FTS query, falling back to a LIKE scan when the
+// FTS5 table cannot be used.
+//
+// FTS5 is an optional SQLite module and its virtual table can fail to
+// construct on a database whose shadow tables were written by a different
+// build. Falling back to a scan keeps the command working; the base table is
+// the source of truth either way, so only ranking is lost.
+func queryLogEntries(ctx context.Context, db *sql.DB, query string, params []any, term, category string, cutoff int64, limit int) (*sql.Rows, error) {
+	if rows, err := db.QueryContext(ctx, query, params...); err == nil {
+		return rows, nil
+	}
+	fallback := `
+SELECT e.logged_at, e.category, e.message
+FROM fb_log_entries e
+WHERE e.message LIKE ? AND e.logged_at >= ?`
+	fallbackParams := []any{"%" + term + "%", cutoff}
+	if category != "" {
+		fallback += " AND e.category = ?"
+		fallbackParams = append(fallbackParams, category)
+	}
+	fallback += " ORDER BY e.logged_at DESC"
+	if limit > 0 {
+		fallback += " LIMIT ?"
+		fallbackParams = append(fallbackParams, limit)
+	}
+	rows, err := db.QueryContext(ctx, fallback, fallbackParams...)
+	if err != nil {
+		return nil, fmt.Errorf("searching the retained log: %w", err)
+	}
+	return rows, nil
 }
 
 // ftsQuery turns a user term into an FTS5 expression.

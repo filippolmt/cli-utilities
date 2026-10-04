@@ -1,0 +1,319 @@
+{
+  "api_name": "subito",
+  "base_url": "https://hades.subito.it/v1",
+  "description": "Search Subito.it without a browser, rank ads against the real market, and watch for new listings from cron.",
+  "mcp_ready": "full",
+  "http_transport": "standard",
+  "auth": {
+    "type": "none"
+  },
+  "required_headers": [],
+  "tools": [
+    {
+      "name": "ads_check",
+      "description": "Ask whether a search has new listings since a given listing urn (cheap, no listing data). Required: last. Optional: query, category-id, region-id (plus 2 more). Returns the CheckResult.",
+      "method": "GET",
+      "path": "/search/items/check",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "query",
+          "wire_name": "q",
+          "type": "string",
+          "location": "query",
+          "description": "Keywords, same as ads search",
+          "aliases": [
+            "q"
+          ]
+        },
+        {
+          "name": "category-id",
+          "wire_name": "c",
+          "type": "string",
+          "location": "query",
+          "description": "Category id"
+        },
+        {
+          "name": "region-id",
+          "wire_name": "r",
+          "type": "string",
+          "location": "query",
+          "description": "Region id"
+        },
+        {
+          "name": "ad-type",
+          "wire_name": "t",
+          "type": "string",
+          "location": "query",
+          "description": "Ad type key"
+        },
+        {
+          "name": "sort",
+          "type": "string",
+          "location": "query",
+          "description": "Sort order (keep datedesc)"
+        },
+        {
+          "name": "last",
+          "type": "string",
+          "location": "query",
+          "description": "Urn of the newest listing already seen",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "ads_recommended",
+      "description": "Listings Subito recommends next to one listing (similar items); pass the urn field of a listing from ads search or market deals output. Required: urn. Optional: limit (default: 20). Returns array of Ad.",
+      "method": "GET",
+      "path": "/search/items/detail-recommended",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "urn",
+          "type": "string",
+          "location": "query",
+          "description": "Listing urn (id:ad:\u003cuuid\u003e:list:\u003clist_id\u003e), as returned by ads search",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "wire_name": "lim",
+          "type": "int",
+          "location": "query",
+          "description": "Number of recommendations"
+        }
+      ]
+    },
+    {
+      "name": "ads_search",
+      "description": "Search listings by keyword, category, place, price and more. Returns newest first by default. Optional: query, category-id, ad-type (default: s) (plus 11 more).",
+      "method": "GET",
+      "path": "/search/items",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "query",
+          "wire_name": "q",
+          "type": "string",
+          "location": "query",
+          "description": "Keywords (Subito matches loosely and mixes nearby models)",
+          "aliases": [
+            "q"
+          ]
+        },
+        {
+          "name": "category-id",
+          "wire_name": "c",
+          "type": "string",
+          "location": "query",
+          "description": "Category id (see 'categories list'), e.g. 2 Auto, 41 Biciclette, 12 Telefonia, 10 Informatica"
+        },
+        {
+          "name": "ad-type",
+          "wire_name": "t",
+          "type": "string",
+          "location": "query",
+          "description": "Ad type key: s vendita, k cerco, u affitto, h affitto vacanze, g regalo"
+        },
+        {
+          "name": "region-id",
+          "wire_name": "r",
+          "type": "string",
+          "location": "query",
+          "description": "Region id (see 'geo regions'), e.g. 4 Lombardia"
+        },
+        {
+          "name": "province-id",
+          "wire_name": "ci",
+          "type": "string",
+          "location": "query",
+          "description": "Province id within the region (see 'geo provinces')"
+        },
+        {
+          "name": "town-istat",
+          "wire_name": "to",
+          "type": "string",
+          "location": "query",
+          "description": "Town ISTAT code (see 'geo towns'), e.g. 015146 Milano"
+        },
+        {
+          "name": "price-min",
+          "wire_name": "ps",
+          "type": "int",
+          "location": "query",
+          "description": "Minimum price in euro"
+        },
+        {
+          "name": "price-max",
+          "wire_name": "pe",
+          "type": "int",
+          "location": "query",
+          "description": "Maximum price in euro"
+        },
+        {
+          "name": "shippable",
+          "wire_name": "shp",
+          "type": "bool",
+          "location": "query",
+          "description": "Only listings that can be shipped (TuttoSubito)"
+        },
+        {
+          "name": "title-only",
+          "wire_name": "qso",
+          "type": "bool",
+          "location": "query",
+          "description": "Match keywords in the title only"
+        },
+        {
+          "name": "advertiser-type",
+          "wire_name": "advt",
+          "type": "string",
+          "location": "query",
+          "description": "Advertiser type: '0,2' private, '1' verified dealer (shop)"
+        },
+        {
+          "name": "sort",
+          "type": "string",
+          "location": "query",
+          "description": "Sort order"
+        },
+        {
+          "name": "page-size",
+          "wire_name": "lim",
+          "type": "int",
+          "location": "query",
+          "description": "Listings per page (max 100)"
+        },
+        {
+          "name": "start",
+          "type": "int",
+          "location": "query",
+          "description": "Offset of the first listing"
+        }
+      ]
+    },
+    {
+      "name": "categories_filters",
+      "description": "Show the search filters a category accepts: query-string key, type and value source. Required: category, ad_type. Returns array of Filter.",
+      "method": "GET",
+      "path": "/search/categories/{category}/ad_types/{ad_type}/filters",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "category",
+          "type": "string",
+          "location": "path",
+          "description": "Category id (0 for all categories)",
+          "required": true
+        },
+        {
+          "name": "ad_type",
+          "type": "string",
+          "location": "path",
+          "description": "Ad type key (s, k, u, h, g)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "categories_list",
+      "description": "List every category with its id and macro-category. Returns array of Value.",
+      "method": "GET",
+      "path": "/values/categories",
+      "no_auth": true,
+      "params": []
+    },
+    {
+      "name": "geo_provinces",
+      "description": "List the provinces of a region (Subito calls them cities). Required: region. Returns array of Place.",
+      "method": "GET",
+      "path": "/geo/regions/{region}/cities",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "region",
+          "type": "string",
+          "location": "path",
+          "description": "Region id, e.g. 4 Lombardia",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "geo_regions",
+      "description": "List the 20 regions with their ids. Returns array of Place.",
+      "method": "GET",
+      "path": "/geo/regions",
+      "no_auth": true,
+      "params": []
+    },
+    {
+      "name": "geo_towns",
+      "description": "List the towns of a province with ISTAT codes and coordinates. Required: region, province. Returns array of Place.",
+      "method": "GET",
+      "path": "/geo/regions/{region}/cities/{province}/towns",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "region",
+          "type": "string",
+          "location": "path",
+          "description": "Region id",
+          "required": true
+        },
+        {
+          "name": "province",
+          "type": "string",
+          "location": "path",
+          "description": "Province id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "values_get",
+      "description": "Values of one filter list; the path comes from 'categories filters' datasource, without /v1/values/. Required: value_path. Optional: category. Returns the ValueList.",
+      "method": "GET",
+      "path": "/values/{value_path}",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "value_path",
+          "type": "string",
+          "location": "path",
+          "description": "List path, e.g. cars/brands, cars/brands/000083/metamodels, fuels/types, item_condition/types",
+          "required": true
+        },
+        {
+          "name": "category",
+          "type": "string",
+          "location": "query",
+          "description": "Category id some lists require, e.g. 2 for cars"
+        }
+      ]
+    }
+  ],
+  "novel_features": [
+    {
+      "name": "Deal ranking",
+      "command": "market deals",
+      "description": "Rank every ad for a search by how far it sits below or above the like-for-like market price."
+    },
+    {
+      "name": "Scam signals",
+      "command": "ads risk",
+      "description": "Check one ad for mechanical scam signals with the evidence for each. Photos are not checked and the seller check covers only ads this CLI has already seen, so \"ok\" is not a clearance."
+    },
+    {
+      "name": "Asking-price suggestion",
+      "command": "market suggest",
+      "description": "Get a listing price, a minimum and a quick-sale price from at least five comparable ads (asking prices of private sellers; no price below five comparables)."
+    },
+    {
+      "name": "Ad timeline",
+      "command": "ads history",
+      "description": "See when an ad was first seen, every price change, renewals and likely reposts, from what earlier searches and watches recorded locally."
+    }
+  ]
+}

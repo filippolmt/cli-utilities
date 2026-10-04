@@ -87,6 +87,7 @@ connection state; use 'wan status' instead.`,
 			if err != nil {
 				return fmt.Errorf("reading the connection samples: %w", err)
 			}
+			defer func() { _ = rows.Close() }()
 			type sample struct {
 				at        int64
 				uptime    int64
@@ -99,14 +100,12 @@ connection state; use 'wan status' instead.`,
 				var ip, lastErr sql.NullString
 				var uptime sql.NullInt64
 				if err := rows.Scan(&s.at, &uptime, &ip, &lastErr); err != nil {
-					_ = rows.Close()
 					return fmt.Errorf("reading a connection sample: %w", err)
 				}
 				s.uptime, s.ip, s.lastError = uptime.Int64, ip.String, lastErr.String
 				samples = append(samples, s)
 			}
 			if err := rows.Err(); err != nil {
-				_ = rows.Close()
 				return fmt.Errorf("iterating connection samples: %w", err)
 			}
 			if err := rows.Close(); err != nil {

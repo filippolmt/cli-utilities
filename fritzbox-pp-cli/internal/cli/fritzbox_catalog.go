@@ -74,17 +74,16 @@ func catalogSnapshots(ctx context.Context, db *store.Store) ([]int64, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listing catalog snapshots: %w", err)
 	}
+	defer func() { _ = rows.Close() }()
 	var out []int64
 	for rows.Next() {
 		var at int64
 		if err := rows.Scan(&at); err != nil {
-			_ = rows.Close()
 			return nil, fmt.Errorf("reading a catalog snapshot: %w", err)
 		}
 		out = append(out, at)
 	}
 	if err := rows.Err(); err != nil {
-		_ = rows.Close()
 		return nil, fmt.Errorf("iterating catalog snapshots: %w", err)
 	}
 	if err := rows.Close(); err != nil {
@@ -101,18 +100,17 @@ func loadCatalog(ctx context.Context, db *store.Store, takenAt int64) (map[strin
 	if err != nil {
 		return nil, fmt.Errorf("reading catalog snapshot %d: %w", takenAt, err)
 	}
+	defer func() { _ = rows.Close() }()
 	out := map[string]catalogRow{}
 	for rows.Next() {
 		var svc, action string
 		var in, outArgs sql.NullString
 		if err := rows.Scan(&svc, &action, &in, &outArgs); err != nil {
-			_ = rows.Close()
 			return nil, fmt.Errorf("reading a catalog row: %w", err)
 		}
 		out[svc+"."+action] = catalogRow{Service: svc, Action: action, In: in.String, Out: outArgs.String}
 	}
 	if err := rows.Err(); err != nil {
-		_ = rows.Close()
 		return nil, fmt.Errorf("iterating catalog rows: %w", err)
 	}
 	if err := rows.Close(); err != nil {

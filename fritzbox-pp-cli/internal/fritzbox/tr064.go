@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -256,7 +257,7 @@ func decodeSOAPBody(raw []byte) (map[string]string, error) {
 	depth := 0
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -306,21 +307,33 @@ func (c *TR064) get(ctx context.Context, path string) ([]byte, error) {
 	return raw, nil
 }
 
-func (c *TR064) post(ctx context.Context, path, soapAction string, body []byte) (*http.Response, []byte, error) {
+// tr064Reply is what callers need from a TR-064 response once attempt has
+// read and closed its body: no live *http.Response leaves attempt.
+type tr064Reply struct {
+	StatusCode int
+	Header     http.Header
+}
+
+// throttleError adapts a reply to the shared ThrottleError constructor.
+func (r tr064Reply) throttleError(url string) error {
+	return newThrottleError(&http.Response{StatusCode: r.StatusCode, Header: r.Header}, url)
+}
+
+func (c *TR064) post(ctx context.Context, path, soapAction string, body []byte) (tr064Reply, []byte, error) {
 	return c.do(ctx, http.MethodPost, path, soapAction, body)
 }
 
 // do issues a request, answering a digest challenge when one comes back.
-func (c *TR064) do(ctx context.Context, method, path, soapAction string, body []byte) (*http.Response, []byte, error) {
+func (c *TR064) do(ctx context.Context, method, path, soapAction string, body []byte) (tr064Reply, []byte, error) {
 	resp, raw, err := c.attempt(ctx, method, path, soapAction, body, true)
 	if err != nil {
-		return nil, nil, err
+		return tr064Reply{}, nil, err
 	}
 	// Checked ahead of the digest branch: a throttled box answers 429 or 503
 	// without a WWW-Authenticate header, and treating that as a failed
 	// challenge would report an auth problem the credentials do not have.
 	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
-		return nil, nil, newThrottleError(resp, c.base+path)
+		return tr064Reply{}, nil, resp.throttleError(c.base + path)
 	}
 	if resp.StatusCode != http.StatusUnauthorized {
 		return resp, raw, nil
@@ -328,7 +341,7 @@ func (c *TR064) do(ctx context.Context, method, path, soapAction string, body []
 
 	challenge := parseDigestChallenge(resp.Header.Get("WWW-Authenticate"))
 	if challenge == nil {
-		return nil, nil, fmt.Errorf("router demanded an authentication scheme this CLI does not implement: %q", resp.Header.Get("WWW-Authenticate"))
+		return tr064Reply{}, nil, fmt.Errorf("router demanded an authentication scheme this CLI does not implement: %q", resp.Header.Get("WWW-Authenticate"))
 	}
 	c.mu.Lock()
 	c.challenge = challenge
@@ -337,22 +350,22 @@ func (c *TR064) do(ctx context.Context, method, path, soapAction string, body []
 
 	resp, raw, err = c.attempt(ctx, method, path, soapAction, body, true)
 	if err != nil {
-		return nil, nil, err
+		return tr064Reply{}, nil, err
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, nil, fmt.Errorf("router rejected the TR-064 credentials; check FRITZBOX_USERNAME and FRITZBOX_PASSWORD, and confirm TR-064 is enabled under Home Network, Network Settings, Allow access for applications")
+		return tr064Reply{}, nil, fmt.Errorf("router rejected the TR-064 credentials; check FRITZBOX_USERNAME and FRITZBOX_PASSWORD, and confirm TR-064 is enabled under Home Network, Network Settings, Allow access for applications")
 	}
 	return resp, raw, nil
 }
 
-func (c *TR064) attempt(ctx context.Context, method, path, soapAction string, body []byte, withAuth bool) (*http.Response, []byte, error) {
+func (c *TR064) attempt(ctx context.Context, method, path, soapAction string, body []byte, withAuth bool) (tr064Reply, []byte, error) {
 	var reader io.Reader
 	if body != nil {
 		reader = bytes.NewReader(body)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, c.base+path, reader)
 	if err != nil {
-		return nil, nil, err
+		return tr064Reply{}, nil, err
 	}
 	if soapAction != "" {
 		req.Header.Set("Content-Type", `text/xml; charset="utf-8"`)
@@ -367,7 +380,7 @@ func (c *TR064) attempt(ctx context.Context, method, path, soapAction string, bo
 			c.mu.Unlock()
 			auth, authErr := challenge.authorization(c.username, c.password, method, path, seq)
 			if authErr != nil {
-				return nil, nil, authErr
+				return tr064Reply{}, nil, authErr
 			}
 			req.Header.Set("Authorization", auth)
 		} else {
@@ -380,7 +393,7 @@ func (c *TR064) attempt(ctx context.Context, method, path, soapAction string, bo
 	c.limiter.Wait()
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("reaching the router TR-064 interface at %s: %w", c.base, err)
+		return tr064Reply{}, nil, fmt.Errorf("reaching the router TR-064 interface at %s: %w", c.base, err)
 	}
 	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
 		c.limiter.OnRateLimit()
@@ -390,7 +403,7 @@ func (c *TR064) attempt(ctx context.Context, method, path, soapAction string, bo
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxTR064Body))
 	if err != nil {
-		return nil, nil, fmt.Errorf("reading the router response: %w", err)
+		return tr064Reply{}, nil, fmt.Errorf("reading the router response: %w", err)
 	}
-	return resp, raw, nil
+	return tr064Reply{StatusCode: resp.StatusCode, Header: resp.Header}, raw, nil
 }

@@ -5,6 +5,7 @@ package cli
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -135,11 +136,7 @@ Use --duration to stop after a fixed period; the default runs until interrupted.
 }
 
 func asNetError(err error, target *net.Error) bool {
-	ne, ok := err.(net.Error)
-	if ok {
-		*target = ne
-	}
-	return ok
+	return errors.As(err, target)
 }
 
 // parseCallMonitorLine decodes one semicolon-delimited monitor record.

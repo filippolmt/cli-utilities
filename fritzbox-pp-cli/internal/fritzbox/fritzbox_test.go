@@ -1,6 +1,7 @@
 package fritzbox
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -216,11 +217,7 @@ func TestParseSOAPFault(t *testing.T) {
 }
 
 func asSOAPFault(err error, target **SOAPFault) bool {
-	f, ok := err.(*SOAPFault)
-	if ok {
-		*target = f
-	}
-	return ok
+	return errors.As(err, target)
 }
 
 func TestServiceName(t *testing.T) {

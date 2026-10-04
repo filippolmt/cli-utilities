@@ -50,9 +50,8 @@ jobs:
       - run: go test -count=1 ./...
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
-  # Lint gates only lines a change introduces, computed by git rather than
-  # the PR-diff API (which refuses diffs over 20,000 lines, e.g. a new CLI).
-  # Generated files are excluded by each module's .golangci.yml.
+  # Generated files and generator-reserved packages are excluded by each
+  # module's .golangci.yml; everything else must be lint-clean.
   lint:
     needs: modules
     runs-on: ubuntu-latest
@@ -62,8 +61,6 @@ jobs:
         dir: ${{ fromJSON(needs.modules.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       # Latest stable Go, as a local build would use: the go directive is a
       # minimum, and pinning its exact patch release would test (and
       # govulncheck) a standard library with already-fixed advisories.
@@ -75,4 +72,3 @@ jobs:
         with:
           version: v2.14.0
           working-directory: ${{ matrix.dir }}
-          args: ${{ github.event_name == 'pull_request' && format('--new-from-merge-base=origin/{0}', github.base_ref) || format('--new-from-rev={0}', github.event.before) }}

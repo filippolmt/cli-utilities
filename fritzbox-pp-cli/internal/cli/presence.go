@@ -180,17 +180,16 @@ func loadPeople(ctx context.Context, db *sql.DB) (map[string][]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading the people table: %w", err)
 	}
+	defer func() { _ = rows.Close() }()
 	out := map[string][]string{}
 	for rows.Next() {
 		var person, mac string
 		if err := rows.Scan(&person, &mac); err != nil {
-			_ = rows.Close()
 			return nil, fmt.Errorf("reading a people row: %w", err)
 		}
 		out[person] = append(out[person], mac)
 	}
 	if err := rows.Err(); err != nil {
-		_ = rows.Close()
 		return nil, fmt.Errorf("iterating people rows: %w", err)
 	}
 	if err := rows.Close(); err != nil {
@@ -208,6 +207,7 @@ func loadLastSeen(ctx context.Context, db *sql.DB) map[string]int64 {
 	if err != nil {
 		return map[string]int64{}
 	}
+	defer func() { _ = rows.Close() }()
 	out := map[string]int64{}
 	for rows.Next() {
 		var mac string
@@ -218,6 +218,5 @@ func loadLastSeen(ctx context.Context, db *sql.DB) map[string]int64 {
 		out[mac] = at.Int64
 	}
 	_ = rows.Err()
-	_ = rows.Close()
 	return out
 }

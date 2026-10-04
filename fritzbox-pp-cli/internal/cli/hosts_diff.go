@@ -180,6 +180,7 @@ func loadHostSnapshot(ctx context.Context, db *sql.DB, takenAt int64) (map[strin
 	if err != nil {
 		return nil, fmt.Errorf("reading snapshot %d: %w", takenAt, err)
 	}
+	defer func() { _ = rows.Close() }()
 	out := map[string]hostSnapshotRow{}
 	for rows.Next() {
 		// name and ip are declared NOT NULL DEFAULT '' but a database written
@@ -188,13 +189,11 @@ func loadHostSnapshot(ctx context.Context, db *sql.DB, takenAt int64) (map[strin
 		var name, ip sql.NullString
 		var active sql.NullInt64
 		if err := rows.Scan(&mac, &name, &ip, &active); err != nil {
-			_ = rows.Close()
 			return nil, fmt.Errorf("reading a snapshot row: %w", err)
 		}
 		out[mac] = hostSnapshotRow{Name: name.String, IP: ip.String, Active: active.Int64 == 1}
 	}
 	if err := rows.Err(); err != nil {
-		_ = rows.Close()
 		return nil, fmt.Errorf("iterating snapshot rows: %w", err)
 	}
 	if err := rows.Close(); err != nil {

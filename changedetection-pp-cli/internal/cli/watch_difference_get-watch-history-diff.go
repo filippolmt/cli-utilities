@@ -194,9 +194,12 @@ func newWatchDifferenceGetWatchHistoryDiffCmd(flags *rootFlags) *cobra.Command {
 			if flagReplaced != "" {
 				params["replaced"] = formatCLIParamValue(flagReplaced)
 			}
-			data, prov, err := resolveReadWithStrategyAndResponsePath(cmd.Context(), c, flags, "auto", "difference", false, path, params, nil, "", cmd.ErrOrStderr())
+			data, prov, err := resolveReadWithStrategyResponsePathAndJSONGuard(cmd.Context(), c, flags, "auto", "difference", false, path, params, nil, "", false, cmd.ErrOrStderr())
 			if err != nil {
 				return classifyAPIError(err, flags)
+			}
+			if handled, err := printTextBody(cmd, flags, data, prov); handled {
+				return err
 			}
 			// Print provenance to stderr for human-facing output only.
 			// Machine-format flags (--json, --csv, --compact, --quiet, --plain,

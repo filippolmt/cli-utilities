@@ -44,9 +44,12 @@ changedetection changes state through GET query parameters: `?paused=`,
 ## Reprint check
 
 ```bash
-go test ./internal/cli -run 'TestStateChangingGets'
+go test ./internal/cli -run TestStateChangingGets
 go test ./internal/mcp -run TestStateChangingToolsAreNotReadOnly
 ```
+
+Both tests walk every GET command / MCP tool and match the parameter names
+`paused`, `muted` and `recheck*`, so a new state-changing GET is covered too.
 
 ## Upstream
 

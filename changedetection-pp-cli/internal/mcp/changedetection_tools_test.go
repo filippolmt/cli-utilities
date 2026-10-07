@@ -4,24 +4,34 @@
 package mcp
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// These tools can pause, mute or recheck watches, so an MCP client must not
-// auto-approve them as read-only.
+// stateChangingParam names the query parameters changedetection changes state
+// through on a GET: ?paused=, ?muted=, ?recheck=, ?recheck_all=.
+var stateChangingParam = regexp.MustCompile(`^(paused|muted)$|recheck`)
+
+// A tool that can pause, mute or recheck watches must not be read-only, or an
+// MCP client may auto-approve it.
 func TestStateChangingToolsAreNotReadOnly(t *testing.T) {
 	s := server.NewMCPServer("changedetection", "test")
 	RegisterTools(s)
-	tools := s.ListTools()
-	for _, name := range []string{"watch_get", "tag_get", "watch_list-watches"} {
-		tool, ok := tools[name]
-		if !ok {
-			t.Fatalf("%s tool missing", name)
+	found := 0
+	for name, tool := range s.ListTools() {
+		for param := range tool.Tool.InputSchema.Properties {
+			if !stateChangingParam.MatchString(param) {
+				continue
+			}
+			found++
+			if hint := tool.Tool.Annotations.ReadOnlyHint; hint == nil || *hint {
+				t.Errorf("%s takes %q but readOnlyHint = %v, want false", name, param, hint)
+			}
 		}
-		if hint := tool.Tool.Annotations.ReadOnlyHint; hint == nil || *hint {
-			t.Errorf("%s readOnlyHint = %v, want false", name, hint)
-		}
+	}
+	if found == 0 {
+		t.Fatal("no state-changing tool parameters found; is stateChangingParam stale?")
 	}
 }

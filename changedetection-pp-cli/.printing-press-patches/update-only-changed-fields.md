@@ -35,8 +35,10 @@ server's, so `watch create` / `tag create` are left as emitted.
 ## Reprint check
 
 ```bash
-go test ./internal/cli -run TestUpdateSendsOnlyChangedFields
+go test ./internal/cli -run TestUpdatesSendOnlySetFields
 ```
+
+The test walks every PUT/PATCH command, so a new one is covered too.
 
 ## Upstream
 

@@ -23,6 +23,22 @@ Test a hand-written command by running it through `RootCmd()` against an
 `changedetection-pp-cli/internal/cli/changedetection_watches_test.go`
 (`fakeInstance`, `runAgainst`) is the pattern.
 
+MCP: the typed tools in `internal/mcp/tools.go` call the API directly;
+`internal/mcp/cobratree` shells out to the CLI only for commands without a
+typed tool. `tools.go` has lines of tens of KB: grep it with `-o` or
+`| cut -c1-200`.
+
+changedetection's API semantics (which GET parameters change state, which
+values a field takes) are in the instance's OpenAPI:
+`changedetection-pp-cli full-spec --agent | jq -r .results.data | base64 -d`.
+
+## Done
+
+A change to a CLI is done when `python3 scripts/sweep.py <cli-dir>` reports
+nothing, with the credentials loaded. It runs every command live (writes as
+`--dry-run`); sample arguments go in `<cli-dir>/.sweep`, and a CLI without
+one starts by adding it.
+
 ## Credentials
 
 Each CLI keeps its credentials in its own directory, in gitignored

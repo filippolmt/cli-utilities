@@ -16,6 +16,7 @@ import (
 const (
 	testWatchUUID    = "adf44b68-64d7-4424-a6e2-476aaaa3608e"
 	testUntitledUUID = "53b44fc2-63f3-4260-9a20-5a88d73ec1d2"
+	testTagUUID      = "53ae5550-b177-43fd-b021-c9a53545147f"
 )
 
 // fakeInstance serves the endpoints the novel commands read and counts requests.
@@ -34,7 +35,12 @@ func fakeInstance(t *testing.T) (*httptest.Server, *atomic.Int32) {
 				_, _ = w.Write([]byte(`{}`))
 				return
 			}
-			_, _ = w.Write([]byte(`{"` + testWatchUUID + `":{"url":"https://example.com","title":"bob"}}`))
+			// /search carries no page_title; the untitled watch matches on its URL.
+			_, _ = w.Write([]byte(`{"` + testWatchUUID + `":{"url":"https://example.com","title":"bob"},` +
+				`"` + testUntitledUUID + `":{"url":"https://example.org","title":null}}`))
+		case r.URL.Path == "/api/v1/tags":
+			_, _ = w.Write([]byte(`{"` + testTagUUID + `":{"title":"Casa","uuid":"` + testTagUUID + `"},` +
+				`"9bb926b5-4bbe-4f19-b307-03a5aad27cd4":{"title":"Vasco","uuid":"9bb926b5-4bbe-4f19-b307-03a5aad27cd4"}}`))
 		case r.URL.Path == "/api/v1/systeminfo":
 			_, _ = w.Write([]byte(`{"overdue_watches":["` + testWatchUUID + `"]}`))
 		case r.URL.Path == "/api/v1/watch/"+testWatchUUID+"/history":
@@ -55,11 +61,18 @@ func fakeInstance(t *testing.T) (*httptest.Server, *atomic.Int32) {
 
 func runAgainst(t *testing.T, srv *httptest.Server, args ...string) (string, error) {
 	t.Helper()
+	return runAgainstHome(t, srv, t.TempDir(), args...)
+}
+
+// runAgainstHome is runAgainst with a fixed --home, so several runs share one
+// local store.
+func runAgainstHome(t *testing.T, srv *httptest.Server, home string, args ...string) (string, error) {
+	t.Helper()
 	t.Setenv("CHANGEDETECTION_BASE_URL", srv.URL+"/api/v1")
 	t.Setenv("CHANGEDETECTION_CONFIG", "")
 	t.Setenv("CHANGEDETECTION_API_KEY", "test")
 	cmd := RootCmd()
-	cmd.SetArgs(append(args, "--home", t.TempDir(), "--no-cache"))
+	cmd.SetArgs(append(args, "--home", home, "--no-cache"))
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
@@ -117,8 +130,8 @@ func TestNovelCommandsRejectLocalSource(t *testing.T) {
 }
 
 // Live search must match substrings (partial=true), flatten the uuid-keyed
-// response into one row per watch, and emit a single envelope. The generated
-// command did none of the three; see .printing-press-patches/live-search.md.
+// response into one row per watch, title untitled watches, and emit a single
+// envelope. See .printing-press-patches/live-search.md.
 func TestLiveSearchFindsWatchesBySubstring(t *testing.T) {
 	srv, _ := fakeInstance(t)
 	out, err := runAgainst(t, srv, "search", "bo", "--data-source", "live", "--agent")
@@ -135,8 +148,16 @@ func TestLiveSearchFindsWatchesBySubstring(t *testing.T) {
 	if env.Meta.Source != "live" {
 		t.Fatalf("meta.source = %q, want live\n%s", env.Meta.Source, out)
 	}
-	if len(env.Results) != 1 || env.Results[0].UUID != testWatchUUID || env.Results[0].Title != "bob" {
-		t.Fatalf("results = %+v, want the one watch with its uuid\n%s", env.Results, out)
+	titles := map[string]string{}
+	for _, r := range env.Results {
+		titles[r.UUID] = r.Title
+	}
+	if len(titles) != 2 || titles[testWatchUUID] != "bob" {
+		t.Fatalf("results = %+v, want both watches with their uuid\n%s", env.Results, out)
+	}
+	// An untitled watch shows its page title, as everywhere else.
+	if titles[testUntitledUUID] != "Novità" {
+		t.Fatalf("untitled watch title = %q, want its page title\n%s", titles[testUntitledUUID], out)
 	}
 }
 
@@ -195,5 +216,58 @@ func TestTextEndpointsReturnTheBody(t *testing.T) {
 				t.Fatalf("results = %q (err %v), want %q\n%s", env.Results, err, want[name], out)
 			}
 		})
+	}
+}
+
+// Live list reads cache their rows for offline use. Every changedetection list
+// is an object keyed by uuid, which the write-through cache used to store as
+// one row without an id (warning "no extractable ID field"), so nothing landed.
+func TestLiveListsFeedTheLocalStore(t *testing.T) {
+	srv, _ := fakeInstance(t)
+	home := t.TempDir()
+	if out, err := runAgainstHome(t, srv, home, "watch", "list-watches", "--agent"); err != nil {
+		t.Fatalf("list-watches: %v\n%s", err, out)
+	}
+	out, err := runAgainstHome(t, srv, home, "search", "bob", "--data-source", "local", "--agent")
+	if err != nil {
+		t.Fatalf("local search: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, testWatchUUID) {
+		t.Fatalf("local store has no row for the watch listed live:\n%s", out)
+	}
+}
+
+// sync stores one row per watch and per tag. It used to fail with "missing id
+// for watch" and store each uuid-keyed tag list as a single row.
+func TestSyncStoresEveryWatchAndTag(t *testing.T) {
+	srv, _ := fakeInstance(t)
+	home := t.TempDir()
+	if out, err := runAgainstHome(t, srv, home, "sync", "--agent", "--strict"); err != nil {
+		t.Fatalf("sync: %v\n%s", err, out)
+	}
+	for query, want := range map[string]string{"bob": testWatchUUID, "vasco": "9bb926b5-4bbe-4f19-b307-03a5aad27cd4"} {
+		out, err := runAgainstHome(t, srv, home, "search", query, "--data-source", "local", "--agent")
+		if err != nil {
+			t.Fatalf("local search %q: %v\n%s", query, err, out)
+		}
+		if !strings.Contains(out, want) {
+			t.Fatalf("local search %q: no row %s after sync:\n%s", query, want, out)
+		}
+	}
+}
+
+// `find --partial` is a switch: bare, it must not swallow the next flag (it
+// used to take "--agent" as its value, and the server answered 500).
+func TestFindPartialIsASwitch(t *testing.T) {
+	srv, _ := fakeInstance(t)
+	out, err := runAgainst(t, srv, "find", "--q", "bo", "--partial", "--agent")
+	if err != nil {
+		t.Fatalf("find --partial: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, testWatchUUID) || !strings.Contains(out, `"source": "live"`) {
+		t.Fatalf("find --partial --agent: want the watch in an agent envelope\n%s", out)
+	}
+	if _, err := runAgainst(t, srv, "find", "--q", "bo", "--partial", "false", "--agent"); err == nil {
+		t.Fatal("find --partial false: a stray positional must be an error, not silently ignored")
 	}
 }

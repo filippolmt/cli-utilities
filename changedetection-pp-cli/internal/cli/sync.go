@@ -522,7 +522,7 @@ func syncResource(ctx context.Context, c interface {
 
 		// Try to extract items from the response.
 		// Strategy: try array first, then common wrapper keys.
-		items, nextCursor, hasMore := extractPageItems(data, pageSize.cursorParam, responsePathForResource(resource, path)...)
+		items, nextCursor, hasMore := extractPageItems(flattenUUIDMap(data), pageSize.cursorParam, responsePathForResource(resource, path)...)
 
 		// Page-int paginator fallback: when the API paginates by integer
 		// ?page=N and emits no body cursor, treat a full page as a signal

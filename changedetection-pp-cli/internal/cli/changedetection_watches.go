@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -101,9 +102,12 @@ func fetchWatches(ctx context.Context, c *client.Client) ([]watchRow, error) {
 	return rows, nil
 }
 
+var uuidKey = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
 // flattenUUIDMap turns a uuid-keyed object ({"<uuid>": {...}}, the shape of
-// /watch and /search) into an array of its values with "uuid" set, the shape
-// the generic search pipeline expects. Any other body is returned unchanged.
+// /watch, /tags and /search) into an array of its values with "uuid" set, the
+// shape the generic search and write-through pipelines expect. Any other body,
+// including a detail object, is returned unchanged.
 func flattenUUIDMap(data json.RawMessage) json.RawMessage {
 	var m map[string]map[string]json.RawMessage
 	if json.Unmarshal(data, &m) != nil {
@@ -111,6 +115,9 @@ func flattenUUIDMap(data json.RawMessage) json.RawMessage {
 	}
 	uuids := make([]string, 0, len(m))
 	for uuid := range m {
+		if !uuidKey.MatchString(uuid) {
+			return data
+		}
 		uuids = append(uuids, uuid)
 	}
 	sort.Strings(uuids)
@@ -128,6 +135,49 @@ func flattenUUIDMap(data json.RawMessage) json.RawMessage {
 	out, err := json.Marshal(rows)
 	if err != nil {
 		return data
+	}
+	return out
+}
+
+// withPageTitles gives untitled rows of a flattened watch list the page title,
+// as fetchWatches does: /search returns no page_title. Best effort: when no
+// row needs it, or /watch fails, rows come back unchanged.
+func withPageTitles(ctx context.Context, c *client.Client, rows json.RawMessage) json.RawMessage {
+	var items []map[string]json.RawMessage
+	if json.Unmarshal(rows, &items) != nil {
+		return rows
+	}
+	untitled := false
+	for _, item := range items {
+		var title string
+		_ = json.Unmarshal(item["title"], &title)
+		if strings.TrimSpace(title) == "" {
+			untitled = true
+			break
+		}
+	}
+	if !untitled {
+		return rows
+	}
+	watches, err := fetchWatches(ctx, c)
+	if err != nil {
+		return rows
+	}
+	titles := make(map[string]string, len(watches))
+	for _, w := range watches {
+		titles[w.UUID] = w.Title
+	}
+	for _, item := range items {
+		var title, uuid string
+		_ = json.Unmarshal(item["title"], &title)
+		_ = json.Unmarshal(item["uuid"], &uuid)
+		if strings.TrimSpace(title) == "" && titles[uuid] != "" {
+			item["title"], _ = json.Marshal(titles[uuid])
+		}
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return rows
 	}
 	return out
 }

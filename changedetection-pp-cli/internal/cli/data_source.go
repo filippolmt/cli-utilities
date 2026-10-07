@@ -323,6 +323,9 @@ func writeThroughCache(ctx context.Context, resourceType string, data json.RawMe
 	}
 	defer db.Close()
 
+	// changedetection lists are objects keyed by uuid; cache one row each.
+	data = flattenUUIDMap(data)
+
 	// Collect items to upsert from various response shapes
 	var items []json.RawMessage
 

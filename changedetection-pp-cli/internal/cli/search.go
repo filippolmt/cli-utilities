@@ -115,11 +115,12 @@ In local mode: searches locally synced data only.`,
 					return err
 				}
 				data, getErr := c.Get(cmd.Context(), "/search", map[string]string{
-					"q": query,
+					"q":       query,
+					"partial": "true",
 				})
 				if getErr == nil {
 					// Live search succeeded
-					results := extractSearchResults(data, searchResponsePaths...)
+					results := extractSearchResults(flattenUUIDMap(data), searchResponsePaths...)
 					prov := DataProvenance{Source: "live"}
 					return outputSearchResults(cmd, flags, results, limit, prov)
 				}
@@ -251,20 +252,16 @@ func outputSearchResults(cmd *cobra.Command, flags *rootFlags, results []json.Ra
 		if flags.csv || flags.plain || flags.quiet {
 			return printOutputWithFlags(cmd.OutOrStdout(), data, flags)
 		}
-		outputFlags := *flags
 		if flags.selectFields != "" {
 			data = filterFields(data, flags.selectFields)
-			outputFlags.selectFields = ""
-			outputFlags.compact = false
 		} else if flags.compact {
 			data = compactFields(data)
-			outputFlags.compact = false
 		}
 		wrapped, err := wrapWithProvenance(data, prov)
 		if err != nil {
 			return err
 		}
-		return printOutputWithFlags(cmd.OutOrStdout(), wrapped, &outputFlags)
+		return printOutput(cmd.OutOrStdout(), wrapped, true)
 	}
 
 	if len(results) == 0 {

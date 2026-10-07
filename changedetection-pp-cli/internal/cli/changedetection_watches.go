@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ type watchRow struct {
 	URL         string          `json:"url"`
 	Link        string          `json:"link"`
 	Title       string          `json:"title"`
+	PageTitle   string          `json:"page_title"`
 	LastChecked int64           `json:"last_checked"`
 	LastChanged int64           `json:"last_changed"`
 	LastError   json.RawMessage `json:"last_error"`
@@ -44,6 +46,27 @@ func (w watchRow) errorText() string {
 		return strings.TrimSpace(msg)
 	}
 	return s
+}
+
+// newLiveClient builds the client for the novel commands, which read the live
+// API only: they have no local-store path, so --data-source local is rejected
+// instead of silently going to the network.
+func newLiveClient(flags *rootFlags) (*client.Client, error) {
+	if flags.dataSource == "local" {
+		return nil, usageErr(fmt.Errorf("this command reads the live API only; --data-source local is not supported"))
+	}
+	return flags.newClient()
+}
+
+// printLiveJSON is printJSONFiltered with meta.source "live": the generic
+// printer labels every result "local", which is wrong for data just read from
+// the API.
+func printLiveJSON(w io.Writer, v any, flags *rootFlags) error {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return printOutputWithFlagsMeta(w, json.RawMessage(raw), flags, map[string]any{"source": "live"})
 }
 
 // fetchWatches GETs /watch and flattens the uuid-keyed map into a slice,
@@ -67,10 +90,46 @@ func fetchWatches(ctx context.Context, c *client.Client) ([]watchRow, error) {
 		if w.UUID == "" {
 			w.UUID = uuid
 		}
+		// title is the user's label and is often unset; the web UI then shows
+		// the fetched page title, and so do we.
+		if strings.TrimSpace(w.Title) == "" {
+			w.Title = w.PageTitle
+		}
 		rows = append(rows, w)
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].LastChanged > rows[j].LastChanged })
 	return rows, nil
+}
+
+// flattenUUIDMap turns a uuid-keyed object ({"<uuid>": {...}}, the shape of
+// /watch and /search) into an array of its values with "uuid" set, the shape
+// the generic search pipeline expects. Any other body is returned unchanged.
+func flattenUUIDMap(data json.RawMessage) json.RawMessage {
+	var m map[string]map[string]json.RawMessage
+	if json.Unmarshal(data, &m) != nil {
+		return data
+	}
+	uuids := make([]string, 0, len(m))
+	for uuid := range m {
+		uuids = append(uuids, uuid)
+	}
+	sort.Strings(uuids)
+	rows := make([]map[string]json.RawMessage, 0, len(m))
+	for _, uuid := range uuids {
+		row := m[uuid]
+		if row == nil {
+			return data
+		}
+		if _, ok := row["uuid"]; !ok {
+			row["uuid"], _ = json.Marshal(uuid)
+		}
+		rows = append(rows, row)
+	}
+	out, err := json.Marshal(rows)
+	if err != nil {
+		return data
+	}
+	return out
 }
 
 // isoOrNever renders an epoch-seconds timestamp as RFC3339 UTC, or "never" for 0.

@@ -33,7 +33,7 @@ func newNovelDiffCmd(flags *rootFlags) *cobra.Command {
 			uuid := args[0]
 			ctx, cancel := boundCtx(cmd.Context(), flags)
 			defer cancel()
-			c, err := flags.newClient()
+			c, err := newLiveClient(flags)
 			if err != nil {
 				return err
 			}
@@ -71,7 +71,7 @@ func newNovelDiffCmd(flags *rootFlags) *cobra.Command {
 			}
 
 			if flags.asJSON || (!isTerminal(cmd.OutOrStdout()) && !flags.csv && !flags.quiet && !flags.plain) {
-				return printJSONFiltered(cmd.OutOrStdout(), map[string]any{
+				return printLiveJSON(cmd.OutOrStdout(), map[string]any{
 					"uuid": uuid,
 					"from": isoOrNever(stamps[1]),
 					"to":   isoOrNever(stamps[0]),

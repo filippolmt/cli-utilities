@@ -59,7 +59,7 @@ func newNovelWatchSearchCmd(flags *rootFlags) *cobra.Command {
 
 			ctx, cancel := boundCtx(cmd.Context(), flags)
 			defer cancel()
-			c, err := flags.newClient()
+			c, err := newLiveClient(flags)
 			if err != nil {
 				return err
 			}
@@ -82,7 +82,7 @@ func newNovelWatchSearchCmd(flags *rootFlags) *cobra.Command {
 			if wantsHumanTable(cmd.OutOrStdout(), flags) {
 				return printAutoTable(cmd.OutOrStdout(), rows)
 			}
-			return printJSONFiltered(cmd.OutOrStdout(), rows, flags)
+			return printLiveJSON(cmd.OutOrStdout(), rows, flags)
 		},
 	}
 	cmd.Flags().BoolVar(&useRegex, "regex", false, "Treat the query as a case-insensitive regular expression")

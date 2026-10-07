@@ -16,7 +16,12 @@ Under `linters`:
   generator-reserved packages whose files carry no header;
 - `settings.errcheck.exclude-functions`: `fmt.Fprint`, `fmt.Fprintf`,
   `fmt.Fprintln`; command output to a terminal or pipe has no recovery
-  worth an error branch.
+  worth an error branch;
+- `forbidigo`, enabled, forbidding `printJSONFiltered` and
+  `flags.newClient` outside `internal/cli/changedetection_watches.go`
+  (excluded via `exclusions.rules`): novel commands read the live API and
+  must use `printLiveJSON` / `newLiveClient`, or they report
+  `meta.source: "local"` and ignore `--data-source local`.
 
 ## Why
 
@@ -26,8 +31,8 @@ overwrites, which buries the findings in hand-written code.
 
 ## Reprint check
 
-`grep -n 'generated: lax' .golangci.yml`. If it is gone, restore the block
-above and re-run `golangci-lint run ./...`.
+`grep -n 'generated: lax\|forbidigo' .golangci.yml`. If either is gone,
+restore the block above and re-run `golangci-lint run ./...`.
 
 ## Upstream
 

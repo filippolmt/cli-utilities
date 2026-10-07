@@ -18,10 +18,18 @@ Hand-written code goes in its own files beside them, named after the CLI —
 `internal/cli/fritzbox_*.go`, `internal/store/fritzbox_*.go` and
 `internal/config/fritzbox_config.go`.
 
+Test a hand-written command by running it through `RootCmd()` against an
+`httptest` server; the generated `*_test.go` scaffolds only check `--help`.
+`changedetection-pp-cli/internal/cli/changedetection_watches_test.go`
+(`fakeInstance`, `runAgainst`) is the pattern.
+
 ## Credentials
 
 Each CLI keeps its credentials in its own directory, in gitignored
 `config.toml` and `.env`; the committed templates (`config.toml.example`,
-`.env.template`) list the variables and their gotchas. Env vars override the
-config file. The CLIs read the environment, not `.env`, so load it first:
+`.env.template`) list the variables and their gotchas. The CLI reads that
+`config.toml` only when `<NAME>_CONFIG="$PWD/config.toml"` is exported
+(`CHANGEDETECTION_CONFIG`, `FRITZBOX_CONFIG`, `SUBITO_CONFIG`); otherwise it
+falls back to `~/.config/<cli>/`. Env vars override the config file. The
+CLIs read the environment, not `.env`, so load it first:
 `set -a; . ./.env; set +a` (lines must be `KEY=value`).

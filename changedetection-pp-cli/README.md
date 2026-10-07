@@ -2,7 +2,7 @@
 
 **Every changedetection.io watch, tag, and notification from one CLI — plus cross-watch queries the web UI can't do.**
 
-Drive any self-hosted changedetection.io instance from the terminal or an agent: manage watches, tags, and notifications through the official API, and answer questions the UI never surfaces in one call — `since` rolls up what changed recently, `stale` finds dead monitors, `errored`/`overdue` triage broken or behind-schedule ones, `diff` reads the latest text change directly, and `watch-search` filters locally.
+Drive any self-hosted changedetection.io instance from the terminal or an agent: manage watches, tags, and notifications through the official API, and answer questions the UI never surfaces in one call — `since` rolls up what changed recently, `stale` finds dead monitors, `errored`/`overdue` triage broken or behind-schedule ones, `diff` reads the latest text change directly, and `watch-search` filters by text.
 
 Built for your own instance. Nothing is hardcoded to a specific host — you point it at your instance with a base URL and (optionally) an API key.
 
@@ -97,12 +97,12 @@ export CHANGEDETECTION_CONFIG="$PWD/config.toml"
 
 ## Unique commands
 
-Not available in the web UI or raw API — each answers a cross-watch question in one call.
+Not available in the web UI or raw API — each answers a cross-watch question in one call. They read the live API only, so `--data-source local` is rejected; with no `title`, a watch shows its page title.
 
 | Command | What it does |
 |---------|--------------|
 | `since <duration>` | Watches changed within a window (`24h`, `7d`, `2w`). |
-| `stale [--days N]` | Watches not changed in N days (default 30); never-changed count as stale. |
+| `stale [N]` or `stale --days N` | Watches not changed in N days (default 30); never-changed count as stale. |
 | `errored` | Watches currently in an error/fetch-failed state. |
 | `overdue` | Watches past their scheduled recheck time (from `/systeminfo`). |
 | `diff <uuid>` | Unified text diff of a watch's two most recent snapshots. |

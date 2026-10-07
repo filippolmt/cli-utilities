@@ -42,11 +42,11 @@ snapshot or a diff at all.
 ## Reprint check
 
 ```bash
-changedetection-pp-cli watch history get-watch-snapshot <uuid> latest
-changedetection-pp-cli watch difference get-watch-history-diff <uuid> previous latest
+go test ./internal/cli -run TestTextEndpointsReturnTheBody
 ```
 
-If either prints the non-JSON error, this patch was dropped.
+The test is hand-authored (`changedetection_watches_test.go`) and fails with
+the non-JSON error if this patch was dropped.
 
 ## Upstream
 

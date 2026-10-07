@@ -42,7 +42,11 @@ func fakeInstance(t *testing.T) (*httptest.Server, *atomic.Int32) {
 			_, _ = w.Write([]byte(`{"` + testTagUUID + `":{"title":"Casa","uuid":"` + testTagUUID + `"},` +
 				`"9bb926b5-4bbe-4f19-b307-03a5aad27cd4":{"title":"Vasco","uuid":"9bb926b5-4bbe-4f19-b307-03a5aad27cd4"}}`))
 		case r.URL.Path == "/api/v1/systeminfo":
-			_, _ = w.Write([]byte(`{"overdue_watches":["` + testWatchUUID + `"]}`))
+			_, _ = w.Write([]byte(`{"overdue_watches":["` + testWatchUUID + `","` + testUntitledUUID + `"]}`))
+		case r.URL.Path == "/api/v1/watch/"+testWatchUUID:
+			_, _ = w.Write([]byte(`{"paused":false,"time_schedule_limit":{"enabled":true}}`))
+		case r.URL.Path == "/api/v1/watch/"+testUntitledUUID:
+			_, _ = w.Write([]byte(`{"paused":true,"time_schedule_limit":{"enabled":false}}`))
 		case r.URL.Path == "/api/v1/watch/"+testWatchUUID+"/history":
 			_, _ = w.Write([]byte(`{"1":"a.txt","2":"b.txt"}`))
 		case strings.HasPrefix(r.URL.Path, "/api/v1/watch/"+testWatchUUID+"/history/"):
@@ -269,5 +273,30 @@ func TestFindPartialIsASwitch(t *testing.T) {
 	}
 	if _, err := runAgainst(t, srv, "find", "--q", "bo", "--partial", "false", "--agent"); err == nil {
 		t.Fatal("find --partial false: a stray positional must be an error, not silently ignored")
+	}
+}
+
+// The server lists paused watches as overdue; they are not due. A watch
+// limited to a time window is flagged, since it is overdue outside it by design.
+func TestOverdueSkipsPausedWatches(t *testing.T) {
+	srv, _ := fakeInstance(t)
+	out, err := runAgainst(t, srv, "overdue", "--agent")
+	if err != nil {
+		t.Fatalf("overdue: %v\n%s", err, out)
+	}
+	var env struct {
+		Results []struct {
+			UUID            string
+			ScheduleLimited bool `json:"schedule_limited"`
+		}
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Results) != 1 || env.Results[0].UUID != testWatchUUID {
+		t.Fatalf("results = %+v, want only the unpaused watch\n%s", env.Results, out)
+	}
+	if !env.Results[0].ScheduleLimited {
+		t.Fatalf("schedule_limited not set for a watch with time_schedule_limit enabled\n%s", out)
 	}
 }

@@ -104,7 +104,7 @@ Not available in the web UI or raw API — each answers a cross-watch question i
 | `since <duration>` | Watches changed within a window (`24h`, `7d`, `2w`). |
 | `stale [N]` or `stale --days N` | Watches not changed in N days (default 30); never-changed count as stale. |
 | `errored` | Watches currently in an error/fetch-failed state. |
-| `overdue` | Watches past their scheduled recheck time (from `/systeminfo`). |
+| `overdue` | Watches past their scheduled recheck time (from `/systeminfo`), skipping paused ones; `schedule_limited` marks watches that only run in a time window. |
 | `diff <uuid>` | Unified text diff of a watch's two most recent snapshots. |
 | `watch-search <query> [--regex]` | Filter watches by text across URL, title, and error message. |
 

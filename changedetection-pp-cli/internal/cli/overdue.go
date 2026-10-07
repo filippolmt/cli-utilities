@@ -14,7 +14,7 @@ func newNovelOverdueCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "overdue",
 		Short:       "List watches past their scheduled recheck time.",
-		Long:        "List watches the server reports as overdue for a recheck (from /systeminfo overdue_watches), enriched with URL and title from the watch list.",
+		Long:        "List watches the server reports as overdue for a recheck (from /systeminfo overdue_watches), enriched with URL and title from the watch list. Paused watches are skipped; schedule_limited marks watches checked only within a time window, which are overdue outside it by design.",
 		Example:     "  changedetection-pp-cli overdue --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -47,7 +47,22 @@ func newNovelOverdueCmd(flags *rootFlags) *cobra.Command {
 			}
 			rows := make([]map[string]any, 0, len(sys.Overdue))
 			for _, id := range sys.Overdue {
-				row := map[string]any{"uuid": id}
+				// The server counts paused watches as overdue, and watches
+				// limited to a time window as overdue outside it. The list
+				// omits both settings, so read each overdue watch.
+				var detail struct {
+					Paused   bool `json:"paused"`
+					Schedule struct {
+						Enabled bool `json:"enabled"`
+					} `json:"time_schedule_limit"`
+				}
+				if data, derr := c.Get(ctx, "/watch/"+id, nil); derr == nil {
+					_ = json.Unmarshal(data, &detail)
+				}
+				if detail.Paused {
+					continue
+				}
+				row := map[string]any{"uuid": id, "schedule_limited": detail.Schedule.Enabled}
 				if w, ok := byUUID[id]; ok {
 					row["url"] = w.URL
 					row["title"] = w.Title

@@ -120,7 +120,7 @@ In local mode: searches locally synced data only.`,
 				})
 				if getErr == nil {
 					// Live search succeeded
-					results := extractSearchResults(flattenUUIDMap(data), searchResponsePaths...)
+					results := extractSearchResults(withPageTitles(cmd.Context(), c, flattenUUIDMap(data)), searchResponsePaths...)
 					prov := DataProvenance{Source: "live"}
 					return outputSearchResults(cmd, flags, results, limit, prov)
 				}

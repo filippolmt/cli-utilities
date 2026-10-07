@@ -14,7 +14,7 @@ import (
 func newFindPromotedCmd(flags *rootFlags) *cobra.Command {
 	var flagQ string
 	var flagTag string
-	var flagPartial string
+	var flagPartial bool
 
 	cmd := &cobra.Command{
 		Use:   "find",
@@ -22,6 +22,7 @@ func newFindPromotedCmd(flags *rootFlags) *cobra.Command {
 		Long:  "Search web page change monitors (watches) by URL or title text",
 		// TODO: replace placeholder example values before relying on this for live dogfood.
 		Example:     "  changedetection-pp-cli find --q example-value",
+		Args:        cobra.NoArgs,
 		Annotations: map[string]string{"pp:endpoint": "find.search-watches", "pp:method": "GET", "pp:path": "/search", "mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bare invocation of a command with a required flag/body prints help
@@ -47,8 +48,8 @@ func newFindPromotedCmd(flags *rootFlags) *cobra.Command {
 			if flagTag != "" {
 				params["tag"] = formatCLIParamValue(flagTag)
 			}
-			if flagPartial != "" {
-				params["partial"] = formatCLIParamValue(flagPartial)
+			if flagPartial {
+				params["partial"] = "true"
 			}
 			data, prov, err := resolveReadWithStrategyAndResponsePath(cmd.Context(), c, flags, "auto", "find", false, path, params, nil, "", cmd.ErrOrStderr())
 			if err != nil {
@@ -102,7 +103,7 @@ func newFindPromotedCmd(flags *rootFlags) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&flagQ, "q", "", "Search query to match against watch URLs and titles")
 	cmd.Flags().StringVar(&flagTag, "tag", "", "Tag name to limit results (name not UUID)")
-	cmd.Flags().StringVar(&flagPartial, "partial", "", "Allow partial matching of URL query")
+	cmd.Flags().BoolVar(&flagPartial, "partial", false, "Match --q as a substring of URLs and titles instead of exactly")
 
 	// Wire sibling endpoints and sub-resources as subcommands
 

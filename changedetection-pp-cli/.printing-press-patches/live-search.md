@@ -28,13 +28,13 @@ data, getErr := c.Get(cmd.Context(), "/search", map[string]string{
 	"partial": "true",
 })
 if getErr == nil {
-	results := extractSearchResults(flattenUUIDMap(data), searchResponsePaths...)
+	results := extractSearchResults(withPageTitles(cmd.Context(), c, flattenUUIDMap(data)), searchResponsePaths...)
 ```
 
 and `return printOutput(cmd.OutOrStdout(), wrapped, true)`, the call
 `watch list-watches` already uses after `wrapWithProvenance` (the
-`outputFlags` copy goes with it). `flattenUUIDMap` lives in the
-hand-authored `internal/cli/changedetection_watches.go`.
+`outputFlags` copy goes with it). `flattenUUIDMap` and `withPageTitles` live
+in the hand-authored `internal/cli/changedetection_watches.go`.
 
 ## Why
 
@@ -42,6 +42,9 @@ hand-authored `internal/cli/changedetection_watches.go`.
   returned nothing while the title "Bob Alchimia …" exists.
 - The response is an object keyed by watch UUID, not an array, so
   `extractSearchResults` returned the whole map as a single row.
+- It carries no `page_title`, so untitled watches came back with
+  `title: null`; `withPageTitles` fills them from `/watch`, as the novel
+  commands do.
 - `wrapWithProvenance` already builds the `{meta, results}` envelope;
   `printOutputWithFlags` wraps it again under `--agent`, giving
   `{"meta":{"source":"local"},"results":{"meta":{"source":"live"},...}}`.
@@ -54,7 +57,7 @@ go test ./internal/cli -run TestLiveSearchFindsWatchesBySubstring
 ```
 
 The test is hand-authored (`changedetection_watches_test.go`) and fails if
-any of the three changes is dropped.
+any of these changes is dropped.
 
 ## Upstream
 

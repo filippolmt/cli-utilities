@@ -20,7 +20,7 @@ func newWatchGetCmd(flags *rootFlags) *cobra.Command {
 		Use:         "get <uuid>",
 		Short:       "Retrieve web page change monitor (watch) information and set muted/paused status. Returns the FULL Watch JSON.",
 		Example:     "  changedetection-pp-cli watch get 550e8400-e29b-41d4-a716-446655440000",
-		Annotations: map[string]string{"pp:endpoint": "watch.get", "pp:method": "GET", "pp:path": "/watch/{uuid}", "mcp:read-only": "true"},
+		Annotations: map[string]string{"pp:endpoint": "watch.get", "pp:method": "GET", "pp:path": "/watch/{uuid}"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return cmd.Help()
@@ -72,6 +72,10 @@ func newWatchGetCmd(flags *rootFlags) *cobra.Command {
 			c, err := flags.newClient()
 			if err != nil {
 				return err
+			}
+			// --recheck/--paused/--muted change the watch: never answer from cache.
+			if cmd.Flags().Changed("recheck") || cmd.Flags().Changed("paused") || cmd.Flags().Changed("muted") {
+				c.NoCache = true
 			}
 			params := map[string]string{}
 			if flagRecheck != "" {

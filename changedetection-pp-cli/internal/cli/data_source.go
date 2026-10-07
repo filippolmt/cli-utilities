@@ -317,11 +317,17 @@ var writeThroughNestedEnvelopeKeys = []string{"data", "Data", "result", "Result"
 // FTS search covers everything the user has looked up — not just explicit syncs.
 // Best-effort: failures are silently ignored (the live result already succeeded).
 func writeThroughCache(ctx context.Context, resourceType string, data json.RawMessage) {
+	if nonEntityResources[resourceType] || isDryRunResponse(data) {
+		return
+	}
 	db, err := store.OpenWithContext(ctx, defaultDBPath("changedetection-pp-cli"))
 	if err != nil {
 		return
 	}
 	defer db.Close()
+
+	// changedetection lists are objects keyed by uuid; cache one row each.
+	data = flattenUUIDMap(data)
 
 	// Collect items to upsert from various response shapes
 	var items []json.RawMessage

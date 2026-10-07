@@ -104,19 +104,21 @@ Not available in the web UI or raw API — each answers a cross-watch question i
 | `since <duration>` | Watches changed within a window (`24h`, `7d`, `2w`). |
 | `stale [N]` or `stale --days N` | Watches not changed in N days (default 30); never-changed count as stale. |
 | `errored` | Watches currently in an error/fetch-failed state. |
-| `overdue` | Watches past their scheduled recheck time (from `/systeminfo`). |
+| `overdue` | Watches past their scheduled recheck time (from `/systeminfo`), skipping paused ones; `schedule_limited` marks watches that only run in a time window. |
 | `diff <uuid>` | Unified text diff of a watch's two most recent snapshots. |
 | `watch-search <query> [--regex]` | Filter watches by text across URL, title, and error message. |
 
 ## Core commands (from the official API)
 
-- `watch list` · `watch get <uuid>` · `watch create` · `watch update <uuid>` · `watch delete <uuid>`
-- `watch history <uuid>` · `watch difference <uuid> <from> <to>` · `watch favicon <uuid>`
+- `watch list-watches` · `watch get <uuid>` · `watch create` · `watch update <uuid>` · `watch delete <uuid>`
+- `watch history get-watch <uuid>` · `watch history get-watch-snapshot <uuid> <timestamp|latest>` · `watch difference get-watch-history-diff <uuid> <from> <to>` · `watch favicon get-watch <uuid>`
 - `tags` · `tag create` · `tag get <uuid>` · `tag update <uuid>` · `tag delete <uuid>`
 - `notifications get` · `notifications add` · `notifications replace` · `notifications delete`
-- `find <query>` (server-side watch search) · `bulk-import` · `systeminfo` · `full-spec`
+- `find --q <text> [--partial]` (server-side watch search) · `bulk-import` · `systeminfo` · `full-spec`
 
-Run `./changedetection-pp-cli --help` for the complete tree, plus framework commands (`sync`, `search`, `analytics`, `export`, `doctor`, `agent-context`, `which`).
+`watch get --paused/--muted/--recheck`, `tag get --muted/--recheck` and `watch list-watches --recheck-all` change state: they bypass the response cache and are not read-only for MCP.
+
+The `watch`, `tag` and `notifications` groups are hidden from the top-level `--help` to keep it short; `./changedetection-pp-cli watch --help` (or `tag`, `notifications`) lists them. Framework commands: `sync`, `search`, `analytics`, `export`, `doctor`, `agent-context`, `which`.
 
 ## Output formats
 

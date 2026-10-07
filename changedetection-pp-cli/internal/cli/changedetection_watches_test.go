@@ -10,9 +10,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -310,61 +314,91 @@ func TestOverdueSkipsPausedWatches(t *testing.T) {
 	}
 }
 
-// GET endpoints whose query flags change state: watch get --paused/--muted/
-// --recheck, tag get --muted/--recheck, watch list-watches --recheck-all.
-var stateChangingGets = []struct {
-	cmd         []string
-	flag, query string
-	values      []string
-}{
-	{[]string{"watch", "get", testWatchUUID}, "--paused", "paused", []string{"paused", "unpaused", "paused"}},
-	{[]string{"tag", "get", testTagUUID}, "--muted", "muted", []string{"muted", "unmuted", "muted"}},
-	{[]string{"watch", "list-watches"}, "--recheck-all", "recheck_all", []string{"1", "1"}},
+// stateChangingParam names the query parameters changedetection changes state
+// through on a GET: ?paused=, ?muted=, ?recheck=, ?recheck_all=.
+var stateChangingParam = regexp.MustCompile(`^(paused|muted)$|recheck`)
+
+// leafCommands walks the tree for commands annotated with one of the methods.
+func leafCommands(t *testing.T, methods ...string) []*cobra.Command {
+	t.Helper()
+	var out []*cobra.Command
+	var walk func(*cobra.Command)
+	walk = func(c *cobra.Command) {
+		for _, m := range methods {
+			if c.Annotations["pp:method"] == m {
+				out = append(out, c)
+			}
+		}
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	walk(RootCmd())
+	if len(out) == 0 {
+		t.Fatalf("no %v commands found", methods)
+	}
+	return out
 }
 
-// Each state change must reach the server. Served from the response cache,
+// commandArgs is the path of c below the root, with "x" for each positional.
+func commandArgs(c *cobra.Command) []string {
+	args := strings.Fields(c.CommandPath())[1:]
+	for _, word := range strings.Fields(c.Use)[1:] {
+		if strings.HasPrefix(word, "<") {
+			args = append(args, testWatchUUID)
+		}
+	}
+	return args
+}
+
+// firstEnum returns the first value of "(one of: a, b)" in a flag usage.
+func firstEnum(usage string) string {
+	if m := regexp.MustCompile(`one of: ([^,)]+)`).FindStringSubmatch(usage); m != nil {
+		return strings.TrimSpace(m[1])
+	}
+	return "true"
+}
+
+// Every GET flag that changes state must reach the server each time and keep
+// the command off the read-only list. Served from the response cache,
 // paused -> unpaused -> paused within five minutes left the watch unpaused
-// while reporting success.
-func TestStateChangingGetsBypassTheCache(t *testing.T) {
-	for _, tc := range stateChangingGets {
-		t.Run(strings.Join(tc.cmd[:2], " "), func(t *testing.T) {
-			first := tc.values[0]
+// while reporting success; read-only, an MCP client could auto-approve it.
+func TestStateChangingGets(t *testing.T) {
+	found := 0
+	for _, c := range leafCommands(t, "GET") {
+		c.Flags().VisitAll(func(f *pflag.Flag) {
+			if !stateChangingParam.MatchString(f.Name) {
+				return
+			}
+			found++
+			name := c.CommandPath() + " --" + f.Name
+			if c.Annotations["mcp:read-only"] == "true" {
+				t.Errorf("%s changes state but the command is annotated mcp:read-only", name)
+			}
+			query, value := strings.ReplaceAll(f.Name, "-", "_"), firstEnum(f.Usage)
 			var hits atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Query().Get(tc.query) == first {
+				if r.URL.Query().Get(query) == value {
 					hits.Add(1)
 				}
 				_, _ = w.Write([]byte(`{"uuid":"` + testWatchUUID + `"}`))
 			}))
-			t.Cleanup(srv.Close)
+			defer srv.Close()
 			home := t.TempDir()
-			want := int32(0)
-			for _, v := range tc.values {
-				if v == first {
-					want++
-				}
-				args := append(append([]string{}, tc.cmd...), tc.flag, v, "--agent")
+			for i := 0; i < 2; i++ {
+				args := append(commandArgs(c), "--"+f.Name, value, "--agent")
 				if out, err := runCLI(t, srv, home, args...); err != nil {
-					t.Fatalf("%v: %v\n%s", args, err, out)
+					t.Errorf("%s: %v\n%s", name, err, out)
+					return
 				}
 			}
-			if n := hits.Load(); n != want {
-				t.Fatalf("server saw %d %s=%s requests, want %d: the rest came from cache", n, tc.query, first, want)
+			if n := hits.Load(); n != 2 {
+				t.Errorf("%s: server saw %d of 2 requests; the rest came from cache", name, n)
 			}
 		})
 	}
-}
-
-// Because they can change state, these commands are not read-only for MCP.
-func TestStateChangingGetsAreNotMarkedReadOnly(t *testing.T) {
-	for _, tc := range stateChangingGets {
-		cmd, _, err := RootCmd().Find(tc.cmd[:2])
-		if err != nil {
-			t.Fatal(err)
-		}
-		if cmd.Annotations["mcp:read-only"] == "true" {
-			t.Errorf("%s is annotated mcp:read-only but %s changes state", cmd.CommandPath(), tc.flag)
-		}
+	if found == 0 {
+		t.Fatal("no state-changing GET flags found; is stateChangingParam stale?")
 	}
 }
 
@@ -397,28 +431,41 @@ func TestNonEntityReadsDoNotWarn(t *testing.T) {
 	}
 }
 
+var requiredFlag = regexp.MustCompile(`required flag "([^"]+)" not set`)
+
 // An update sends only the fields the user set. Flags with defaults (processor
 // text_json_diff, fetch_backend system, conditions_match_logic ALL) used to
-// ride along, so renaming a watch reset its fetch backend and processor.
-func TestUpdateSendsOnlyChangedFields(t *testing.T) {
-	for _, target := range [][]string{
-		{"watch", "update", testWatchUUID},
-		{"tag", "update", testTagUUID},
-	} {
-		t.Run(target[0], func(t *testing.T) {
+// ride along, so renaming a watch reset its fetch backend and processor. Run
+// with only its required flags, every PUT/PATCH must send only those fields.
+func TestUpdatesSendOnlySetFields(t *testing.T) {
+	for _, c := range leafCommands(t, "PUT", "PATCH") {
+		t.Run(c.CommandPath(), func(t *testing.T) {
+			args := commandArgs(c)
+			set := map[string]bool{}
 			var body map[string]any
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method == http.MethodPut {
-					_ = json.NewDecoder(r.Body).Decode(&body)
-				}
+				_ = json.NewDecoder(r.Body).Decode(&body)
 				_, _ = w.Write([]byte(`{}`))
 			}))
 			t.Cleanup(srv.Close)
-			if out, err := runAgainst(t, srv, append(target, "--title", "nuovo", "--agent", "--yes")...); err != nil {
-				t.Fatalf("%v: %v\n%s", target, err, out)
+			// Commands check their required flags in RunE: add each one the
+			// command asks for, then run again.
+			for {
+				out, err := runAgainst(t, srv, append(args, "--agent", "--yes")...)
+				if err == nil {
+					break
+				}
+				m := requiredFlag.FindStringSubmatch(err.Error())
+				if m == nil || set[strings.ReplaceAll(m[1], "-", "_")] {
+					t.Fatalf("%v\n%s", err, out)
+				}
+				args = append(args, "--"+m[1], "x")
+				set[strings.ReplaceAll(m[1], "-", "_")] = true
 			}
-			if len(body) != 1 || body["title"] != "nuovo" {
-				t.Fatalf("PUT body = %v, want only the title", body)
+			for key := range body {
+				if !set[key] {
+					t.Fatalf("body = %v: %q was not set; a default leaked in", body, key)
+				}
 			}
 		})
 	}

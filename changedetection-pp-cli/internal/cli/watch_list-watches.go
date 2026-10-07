@@ -20,7 +20,7 @@ func newWatchListWatchesCmd(flags *rootFlags) *cobra.Command {
 		Aliases:     []string{"list"},
 		Short:       "Return concise list of available web page change monitors (watches) and basic info",
 		Example:     "  changedetection-pp-cli watch list --agent",
-		Annotations: map[string]string{"pp:endpoint": "watch.list-watches", "pp:method": "GET", "pp:path": "/watch", "mcp:read-only": "true"},
+		Annotations: map[string]string{"pp:endpoint": "watch.list-watches", "pp:method": "GET", "pp:path": "/watch"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed("recheck-all") {
 				allowedRecheckAll := []string{"1"}
@@ -39,6 +39,10 @@ func newWatchListWatchesCmd(flags *rootFlags) *cobra.Command {
 			c, err := flags.newClient()
 			if err != nil {
 				return err
+			}
+			// --recheck-all queues a check of every watch: never answer from cache.
+			if cmd.Flags().Changed("recheck-all") {
+				c.NoCache = true
 			}
 			params := map[string]string{}
 			if flagRecheckAll != "" {

@@ -182,6 +182,16 @@ func withPageTitles(ctx context.Context, c *client.Client, rows json.RawMessage)
 	return out
 }
 
+// nonEntityResources are read responses that hold no entity rows: a status
+// object, the OpenAPI document, a {timestamp: path} history map, an image.
+// The write-through cache skips them instead of warning that they have no id.
+var nonEntityResources = map[string]bool{
+	"systeminfo": true,
+	"full-spec":  true,
+	"history":    true,
+	"favicon":    true,
+}
+
 // isoOrNever renders an epoch-seconds timestamp as RFC3339 UTC, or "never" for 0.
 func isoOrNever(epoch int64) string {
 	if epoch <= 0 {

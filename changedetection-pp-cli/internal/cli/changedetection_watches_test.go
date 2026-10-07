@@ -6,8 +6,10 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -72,11 +74,18 @@ func runAgainst(t *testing.T, srv *httptest.Server, args ...string) (string, err
 // local store.
 func runAgainstHome(t *testing.T, srv *httptest.Server, home string, args ...string) (string, error) {
 	t.Helper()
+	return runCLI(t, srv, home, append(args, "--no-cache")...)
+}
+
+// runCLI runs the CLI against srv with --home and nothing else added, so the
+// HTTP response cache stays on.
+func runCLI(t *testing.T, srv *httptest.Server, home string, args ...string) (string, error) {
+	t.Helper()
 	t.Setenv("CHANGEDETECTION_BASE_URL", srv.URL+"/api/v1")
 	t.Setenv("CHANGEDETECTION_CONFIG", "")
 	t.Setenv("CHANGEDETECTION_API_KEY", "test")
 	cmd := RootCmd()
-	cmd.SetArgs(append(args, "--home", home, "--no-cache"))
+	cmd.SetArgs(append(args, "--home", home))
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
@@ -298,5 +307,119 @@ func TestOverdueSkipsPausedWatches(t *testing.T) {
 	}
 	if !env.Results[0].ScheduleLimited {
 		t.Fatalf("schedule_limited not set for a watch with time_schedule_limit enabled\n%s", out)
+	}
+}
+
+// GET endpoints whose query flags change state: watch get --paused/--muted/
+// --recheck, tag get --muted/--recheck, watch list-watches --recheck-all.
+var stateChangingGets = []struct {
+	cmd         []string
+	flag, query string
+	values      []string
+}{
+	{[]string{"watch", "get", testWatchUUID}, "--paused", "paused", []string{"paused", "unpaused", "paused"}},
+	{[]string{"tag", "get", testTagUUID}, "--muted", "muted", []string{"muted", "unmuted", "muted"}},
+	{[]string{"watch", "list-watches"}, "--recheck-all", "recheck_all", []string{"1", "1"}},
+}
+
+// Each state change must reach the server. Served from the response cache,
+// paused -> unpaused -> paused within five minutes left the watch unpaused
+// while reporting success.
+func TestStateChangingGetsBypassTheCache(t *testing.T) {
+	for _, tc := range stateChangingGets {
+		t.Run(strings.Join(tc.cmd[:2], " "), func(t *testing.T) {
+			first := tc.values[0]
+			var hits atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Query().Get(tc.query) == first {
+					hits.Add(1)
+				}
+				_, _ = w.Write([]byte(`{"uuid":"` + testWatchUUID + `"}`))
+			}))
+			t.Cleanup(srv.Close)
+			home := t.TempDir()
+			want := int32(0)
+			for _, v := range tc.values {
+				if v == first {
+					want++
+				}
+				args := append(append([]string{}, tc.cmd...), tc.flag, v, "--agent")
+				if out, err := runCLI(t, srv, home, args...); err != nil {
+					t.Fatalf("%v: %v\n%s", args, err, out)
+				}
+			}
+			if n := hits.Load(); n != want {
+				t.Fatalf("server saw %d %s=%s requests, want %d: the rest came from cache", n, tc.query, first, want)
+			}
+		})
+	}
+}
+
+// Because they can change state, these commands are not read-only for MCP.
+func TestStateChangingGetsAreNotMarkedReadOnly(t *testing.T) {
+	for _, tc := range stateChangingGets {
+		cmd, _, err := RootCmd().Find(tc.cmd[:2])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cmd.Annotations["mcp:read-only"] == "true" {
+			t.Errorf("%s is annotated mcp:read-only but %s changes state", cmd.CommandPath(), tc.flag)
+		}
+	}
+}
+
+// Responses that are not entities (a status object, a {timestamp: path} map,
+// the --dry-run sentinel) skip the write-through cache instead of warning
+// that they have no id.
+func TestNonEntityReadsDoNotWarn(t *testing.T) {
+	srv, _ := fakeInstance(t)
+	for _, args := range [][]string{
+		{"systeminfo"},
+		{"watch", "history", "get-watch", testWatchUUID},
+		{"watch", "get", testWatchUUID, "--dry-run"},
+	} {
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		stderr := os.Stderr
+		os.Stderr = w
+		_, runErr := runAgainst(t, srv, append(args, "--agent")...)
+		os.Stderr = stderr
+		_ = w.Close()
+		captured, _ := io.ReadAll(r)
+		if runErr != nil {
+			t.Fatalf("%v: %v", args, runErr)
+		}
+		if strings.Contains(string(captured), "not cached locally") {
+			t.Errorf("%v warned:\n%s", args, captured)
+		}
+	}
+}
+
+// An update sends only the fields the user set. Flags with defaults (processor
+// text_json_diff, fetch_backend system, conditions_match_logic ALL) used to
+// ride along, so renaming a watch reset its fetch backend and processor.
+func TestUpdateSendsOnlyChangedFields(t *testing.T) {
+	for _, target := range [][]string{
+		{"watch", "update", testWatchUUID},
+		{"tag", "update", testTagUUID},
+	} {
+		t.Run(target[0], func(t *testing.T) {
+			var body map[string]any
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPut {
+					_ = json.NewDecoder(r.Body).Decode(&body)
+				}
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			t.Cleanup(srv.Close)
+			if out, err := runAgainst(t, srv, append(target, "--title", "nuovo", "--agent", "--yes")...); err != nil {
+				t.Fatalf("%v: %v\n%s", target, err, out)
+			}
+			if len(body) != 1 || body["title"] != "nuovo" {
+				t.Fatalf("PUT body = %v, want only the title", body)
+			}
+		})
 	}
 }

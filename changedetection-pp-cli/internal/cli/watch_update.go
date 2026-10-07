@@ -148,7 +148,7 @@ func newWatchUpdateCmd(flags *rootFlags) *cobra.Command {
 					}
 					body["conditions"] = parsedConditions
 				}
-				if bodyConditionsMatchLogic != "" {
+				if cmd.Flags().Changed("conditions-match-logic") {
 					body["conditions_match_logic"] = bodyConditionsMatchLogic
 				}
 				if bodyDateCreated != 0 {
@@ -168,7 +168,7 @@ func newWatchUpdateCmd(flags *rootFlags) *cobra.Command {
 					}
 					body["extract_text"] = parsedExtractText
 				}
-				if bodyFetchBackend != "" {
+				if cmd.Flags().Changed("fetch-backend") {
 					body["fetch_backend"] = bodyFetchBackend
 				}
 				if cmd.Flags().Changed("filter-failure-notification-send") {
@@ -281,7 +281,7 @@ func newWatchUpdateCmd(flags *rootFlags) *cobra.Command {
 				if bodyPriceChangeThresholdPercent != 0.0 {
 					body["price_change_threshold_percent"] = bodyPriceChangeThresholdPercent
 				}
-				if bodyProcessor != "" {
+				if cmd.Flags().Changed("processor") {
 					body["processor"] = bodyProcessor
 				}
 				if bodyProxy != "" {

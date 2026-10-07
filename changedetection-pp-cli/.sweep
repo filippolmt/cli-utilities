@@ -1,0 +1,34 @@
+# Sample arguments for scripts/sweep.py (see its docstring).
+
+var watch = watch list-watches | .results | to_entries | map(select(.value.last_changed > 0)) | .[0].key
+var tag = tags | .results | keys[0]
+
+run auth status =
+run doctor =
+run sync = --strict
+run diff = {watch}
+run export = watch --format jsonl
+run find = --q a --partial
+run search = a
+run since = 7d
+run watch-search = a
+run watch get = {watch}
+run watch history get-watch = {watch}
+run watch history get-watch-snapshot = {watch} latest
+run watch difference get-watch-history-diff = {watch} previous latest
+run watch update = {watch} --title sweep
+run watch delete = {watch}
+run tag get = {tag}
+run tag update = {tag} --title sweep
+run tag delete = {tag}
+
+skip auth logout = removes the stored credentials
+skip auth setup = interactive
+skip import = creates watches from a JSONL file
+skip profile delete = local profile state, not the API
+skip profile save = local profile state, not the API
+skip profile show = local profile state, not the API
+skip profile use = local profile state, not the API
+skip version = prints plain text by design
+skip workflow archive = same as sync
+skip watch favicon get-watch = binary body: --agent refuses it by design

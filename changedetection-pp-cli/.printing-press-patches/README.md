@@ -11,3 +11,6 @@ not patches.
 
 Each entry states what changed, why the generator's own output was wrong for
 this API, and how to tell whether the reprint still needs the patch.
+For a patch that changes behaviour, the reprint check is a `go test`
+invocation, kept in a hand-authored test file, that fails when the patch is
+dropped.

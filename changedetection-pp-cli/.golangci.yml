@@ -5,10 +5,22 @@ linters:
     # Skip files with a "DO NOT EDIT" header and the generator-reserved
     # packages: the generator owns them, and a reprint overwrites fixes.
     generated: lax
+    rules:
+      # The live-read helpers themselves.
+      - path: internal/cli/changedetection_watches\.go
+        linters: [forbidigo]
     paths:
       - internal/cliutil/
       - internal/platform/
   settings:
+    # Novel commands read the live API: the generic helpers label their
+    # output "local" and ignore --data-source local.
+    forbidigo:
+      forbid:
+        - pattern: ^printJSONFiltered$
+          msg: novel commands read the live API; print with printLiveJSON
+        - pattern: ^flags\.newClient$
+          msg: novel commands read the live API; build the client with newLiveClient
     errcheck:
       # Command output goes to the terminal or a pipe; a failed write there
       # has no recovery worth an error branch.
@@ -18,6 +30,7 @@ linters:
         - fmt.Fprintln
   enable:
     - errorlint
+    - forbidigo
     - govet
     - ineffassign
     - staticcheck

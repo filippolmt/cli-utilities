@@ -39,6 +39,9 @@ func fakeInstance(t *testing.T) (*httptest.Server, *atomic.Int32) {
 			_, _ = w.Write([]byte(`{"overdue_watches":["` + testWatchUUID + `"]}`))
 		case r.URL.Path == "/api/v1/watch/"+testWatchUUID+"/history":
 			_, _ = w.Write([]byte(`{"1":"a.txt","2":"b.txt"}`))
+		case strings.HasPrefix(r.URL.Path, "/api/v1/watch/"+testWatchUUID+"/history/"):
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = w.Write([]byte("2026-10-08 19:30"))
 		case strings.HasPrefix(r.URL.Path, "/api/v1/watch/"+testWatchUUID+"/difference/"):
 			w.Header().Set("Content-Type", "text/plain")
 			_, _ = w.Write([]byte("(added) x"))
@@ -168,5 +171,29 @@ func TestUntitledWatchFallsBackToPageTitle(t *testing.T) {
 	}
 	if len(env.Results) != 1 || env.Results[0].UUID != testUntitledUUID || env.Results[0].Title != "Novità" {
 		t.Fatalf("results = %+v, want the untitled watch titled by its page title\n%s", env.Results, out)
+	}
+}
+
+// Snapshots and diffs are text, not JSON. Reprint check for
+// .printing-press-patches/text-response-endpoints.md: without it both
+// generated commands fail with "API returned a non-JSON response".
+func TestTextEndpointsReturnTheBody(t *testing.T) {
+	cases := map[string][]string{
+		"snapshot": {"watch", "history", "get-watch-snapshot", testWatchUUID, "latest"},
+		"diff":     {"watch", "difference", "get-watch-history-diff", testWatchUUID, "previous", "latest"},
+	}
+	want := map[string]string{"snapshot": "2026-10-08 19:30", "diff": "(added) x"}
+	for name, args := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv, _ := fakeInstance(t)
+			out, err := runAgainst(t, srv, append(args, "--agent")...)
+			if err != nil {
+				t.Fatalf("error = %v, output:\n%s", err, out)
+			}
+			var env struct{ Results string }
+			if err := json.Unmarshal([]byte(out), &env); err != nil || env.Results != want[name] {
+				t.Fatalf("results = %q (err %v), want %q\n%s", env.Results, err, want[name], out)
+			}
+		})
 	}
 }

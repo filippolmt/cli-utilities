@@ -70,7 +70,7 @@ func newAdsCheckCmd(flags *rootFlags) *cobra.Command {
 			if flagLast != "" {
 				params["last"] = formatCLIParamValue(flagLast)
 			}
-			data, prov, err := resolveReadWithStrategyAndResponsePath(cmd.Context(), c, flags, "auto", "ads", false, path, params, nil, "", cmd.ErrOrStderr())
+			data, prov, err := resolveReadWithStrategyAndResponsePath(cmd.Context(), c, flags, "live", "ads", false, path, params, nil, "", cmd.ErrOrStderr())
 			if err != nil {
 				return classifyAPIError(cmd.OutOrStdout(), err, flags)
 			}

@@ -116,6 +116,16 @@ large datasets as it has no memory pressure.`,
 				if !singleItem && config.paginationType != "" {
 					params = resourcePageParams(config, cursor, page, remaining)
 				}
+				if !singleItem {
+					for k, v := range syncResourceParamDefaults(resource) {
+						if params == nil {
+							params = map[string]string{}
+						}
+						if _, set := params[k]; !set {
+							params[k] = v
+						}
+					}
+				}
 				data, err := c.Get(cmd.Context(), path, params)
 				if err != nil {
 					return classifyAPIError(cmd.OutOrStdout(), err, flags)

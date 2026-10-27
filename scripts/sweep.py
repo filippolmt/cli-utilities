@@ -11,7 +11,7 @@ in a throwaway --home:
 - runs every POST/PUT/PATCH/DELETE leaf with --dry-run, so nothing changes.
 
 It reports a non-zero exit, stdout that is not JSON (or JSON lines), unexpected stderr (only
-`hint:` lines and the dry-run request echo are expected), and PUT/PATCH bodies
+`hint:` lines, sync/tail progress events and the dry-run request echo are expected), and PUT/PATCH bodies
 carrying fields the run did not set.
 
 Sample arguments live in <cli-dir>/.sweep, one directive per line:
@@ -104,12 +104,21 @@ def unexpected_stderr(stderr, dry_run):
     noise = []
     for line in stderr.splitlines():
         s = line.strip()
-        if not s or s.startswith("hint:"):
+        if not s or s.startswith("hint:") or is_event(s):
             continue
         if dry_run and not (s.startswith("warning:") or s.startswith("Error")):
             continue  # the echoed request, headers and body
         noise.append(s)
     return noise
+
+
+def is_event(line):
+    """A sync/tail progress event; newer prints send them to stderr under --agent."""
+    try:
+        doc = json.loads(line)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(doc, dict) and "event" in doc and not doc["event"].endswith(("error", "warning"))
 
 
 def is_json(out):

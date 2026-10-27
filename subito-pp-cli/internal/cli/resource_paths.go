@@ -21,7 +21,7 @@ type resourceReadConfig struct {
 }
 
 var resourceReadPaths = map[string]string{ // #nosec G101 -- endpoint paths, not credentials.
-	"ads":        "/search/items/detail-recommended",
+	"ads":        "/search/items",
 	"categories": "/values/categories",
 	"geo":        "/geo/regions",
 }

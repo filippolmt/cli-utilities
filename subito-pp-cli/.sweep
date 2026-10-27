@@ -1,0 +1,40 @@
+# Sample arguments for scripts/sweep.py (see its docstring).
+
+var ad = ads search --query soffione --page-size 1 | .results[0].urn
+
+run doctor =
+run sync = --latest-only
+run export = ads --format jsonl
+run search = soffione
+run recall = soffione
+run values = cars/brands --category 2
+run categories filters = 2 s
+run geo provinces = 4
+run geo towns = 4 3
+run ads check = --query soffione --last {ad}
+run ads get = {ad}
+run ads history = {ad}
+run ads recommended = --urn {ad} --limit 3
+run ads risk = {ad}
+run market deals = soffione
+run market stats = soffione
+run market suggest = soffione
+run watch run =
+
+skip learnings confirm = local learning state, not the API
+skip learnings forget = local learning state, not the API
+skip learnings purge = local learning state, not the API
+skip learnings reject = local learning state, not the API
+skip playbook amend = local learning state, not the API
+skip teach = local learning state, not the API
+skip teach-lookup = local learning state, not the API
+skip teach-pattern = local learning state, not the API
+skip teach-playbook = local learning state, not the API
+skip profile delete = local profile state, not the API
+skip profile save = local profile state, not the API
+skip profile show = local profile state, not the API
+skip profile use = local profile state, not the API
+skip watch add = local watch state; watch run covers the API
+skip watch rm = local watch state, not the API
+skip version = prints plain text by design
+skip workflow archive = same as sync

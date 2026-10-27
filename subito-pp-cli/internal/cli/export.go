@@ -103,6 +103,9 @@ large datasets as it has no memory pressure.`,
 				return nil
 			}
 
+			if !singleItem {
+				limit = exportLimit(resource, limit, cmd.ErrOrStderr())
+			}
 			config := resourceReadConfigFor(resource)
 			allItems := []json.RawMessage{}
 			var singlePayload json.RawMessage
@@ -117,14 +120,7 @@ large datasets as it has no memory pressure.`,
 					params = resourcePageParams(config, cursor, page, remaining)
 				}
 				if !singleItem {
-					for k, v := range syncResourceParamDefaults(resource) {
-						if params == nil {
-							params = map[string]string{}
-						}
-						if _, set := params[k]; !set {
-							params[k] = v
-						}
-					}
+					params = exportListParams(resource, params)
 				}
 				data, err := c.Get(cmd.Context(), path, params)
 				if err != nil {

@@ -1,31 +1,33 @@
-# `--agent` on listing commands keeps the listing fields
+# `--agent` on listing and filter commands keeps the useful fields
 
-**Files:** `internal/cli/ads_search.go`, `internal/cli/ads_recommended.go`
-(the list `adCompactKeep` lives in the hand-written
-`internal/cli/subito_compact.go`)
+**Files:** `internal/cli/ads_search.go`, `internal/cli/ads_recommended.go`,
+`internal/cli/categories_filters.go` (the lists `adCompactKeep` and
+`filterCompactKeep` live in the hand-written `internal/cli/subito_compact.go`)
 
 ## What the generator emits
 
 `compactFields(filtered, map[string]bool{"type": true})`: schema-aware
 compaction that keeps only gravity names (`id`, `name`, `price`, ...). A
-Subito listing's only gravity name is `type`.
+Subito listing and a search filter both have `type` as their only gravity
+name.
 
 ## What this CLI needs
 
-`compactFieldsKeep(filtered, adCompactKeep, map[string]bool{"type": true})`,
+`compactFieldsKeep(filtered, adCompactKeep, ...)` on the two listing commands,
 so `urn`, `subject`, `features` (price, condition), `geo`, `dates` and `urls`
-survive `--agent`/`--compact`.
+survive `--agent`/`--compact`; `compactFieldsKeep(filtered, filterCompactKeep,
+...)` on `categories filters`, so `uri`, `label`, `query_string` and
+`datasource` survive.
 
 ## Why
 
-Without it `ads search --agent` returns every listing as `{"type": ...}`:
-no title, no price, no link.
+Without it these commands return every row as `{"type": ...}`: a listing
+without title, price or link, a filter without its query-string key.
 
 ## Reprint check
 
-`grep -n adCompactKeep internal/cli/ads_search.go internal/cli/ads_recommended.go`
-must show both call sites; `go test ./internal/cli -run TestAdsSearchAgentKeepsListingFields`
-fails when one is gone.
+`go test ./internal/cli -run TestAgentKeepsListingFields` fails for each
+command whose call site is gone.
 
 ## Upstream
 

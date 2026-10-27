@@ -6,11 +6,12 @@
 
 `resolveReadWithStrategyAndResponsePath(..., "auto", "ads", ...)`: a live
 read that writes its response through to the `ads` table and falls back to
-the local store on a network error.
+the local store on a network error. No `Long` help.
 
 ## What this CLI needs
 
-The strategy `"live"`.
+The strategy `"live"`, and a `Long` help saying the command always reads
+live, has no offline fallback and refuses `--data-source local`.
 
 ## Why
 
@@ -22,8 +23,7 @@ field …)` on every call. A local fallback has nothing to answer with either:
 
 ## Reprint check
 
-`subito-pp-cli ads check --query soffione --last <urn> --agent` must print
-nothing on stderr; `grep -n '"live", "ads"' internal/cli/ads_check.go`.
+`go test ./internal/cli -run TestAdsCheckDoesNotWarn`.
 
 ## Upstream
 

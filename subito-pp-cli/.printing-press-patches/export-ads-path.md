@@ -1,32 +1,41 @@
-# `export ads` reads `/search/items` with the sync defaults
+# `export ads` pages `/search/items` with the sync defaults
 
-**Files:** `internal/cli/resource_paths.go`, `internal/cli/export.go`
+**File:** `internal/cli/export.go` (path, paging and helpers live in the
+hand-written `internal/cli/subito_export.go`)
 
 ## What the generator emits
 
-- `resourceReadPaths["ads"] = "/search/items/detail-recommended"`;
-- `export` sends only paging params on a list read.
+- `resourceReadPaths["ads"] = "/search/items/detail-recommended"` and an
+  `ads` read config without pagination;
+- an `export` page loop that sends only paging params.
 
 ## What this CLI needs
 
-- `"/search/items"`, the path `sync` already uses for `ads`;
-- in the `export` page loop, after `resourcePageParams`, the params of
-  `syncResourceParamDefaults(resource)` (`t=s`, `sort=datedesc`) for any key
-  not already set.
+- `subito_export.go` overrides, in `init()`, the `ads` path to
+  `/search/items` and its config to offset paging over `start`/`lim`, 100
+  per page. The generated maps stay untouched.
+- In `export.go`, two calls: `limit = exportLimit(resource, limit,
+  cmd.ErrOrStderr())` before the page loop, and `params =
+  exportListParams(resource, params)` after `resourcePageParams`.
+  `exportListParams` adds `syncResourceParamDefaults` (`t=s`,
+  `sort=datedesc`); `exportLimit` caps `export ads` without `--limit` at 100
+  listings and prints a `hint:` saying so.
 
 ## Why
 
-`detail-recommended` needs the `urn` of one listing, and `/search/items`
-needs at least `t`: without them Subito answers HTTP 400 `No query params
-specified`, so `export ads` always failed. `sync` already seeds the same
-defaults, so both commands now read the same slice (newest listings for sale).
+`detail-recommended` needs one listing's `urn`, and `/search/items` needs
+at least `t`: without them Subito answers HTTP 400 `No query params
+specified`, so `export ads` always failed. Without paging it stopped at the
+first page whatever `--limit` said. Without a cap, an export with no
+`--limit` would page through every listing on Subito.
 
 ## Reprint check
 
-`subito-pp-cli export ads --format jsonl --limit 1` must exit 0.
+`go test ./internal/cli -run TestExportAds`.
 
 ## Upstream
 
-The generator picked the list path of `ads` from a sibling endpoint that
-requires a parameter, and `export` ignores the spec defaults that `sync`
-already applies. Both could share the sync path map and defaults.
+The generator took the list path of `ads` from a sibling endpoint that
+requires a parameter, and `export` ignores the spec defaults and paging
+that `sync` already applies. Both could share the sync path map, defaults
+and pagination.

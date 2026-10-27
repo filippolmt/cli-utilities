@@ -50,6 +50,18 @@ jobs:
       - run: go test -count=1 ./...
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+  # An edit to a generated file survives a reprint only through a record in
+  # .printing-press-patches/. A reprint PR rewrites them on purpose: label it
+  # `reprint`.
+  patches:
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'reprint')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: python3 scripts/check_patches.py "origin/${{ github.base_ref }}"
+
   # Generated files and generator-reserved packages are excluded by each
   # module's .golangci.yml; everything else must be lint-clean.
   lint:

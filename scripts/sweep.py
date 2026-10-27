@@ -3,15 +3,16 @@
 
 Usage: python3 scripts/sweep.py <cli-dir>
 
-Load the CLI's credentials first (see CLAUDE.md). The sweep builds the CLI,
-walks its whole command tree from `agent-context` (hidden groups included) and,
-in a throwaway --home:
+The sweep loads the CLI's own credentials (<cli-dir>/.env, and config.toml as
+<NAME>_CONFIG), builds the CLI, walks its whole command tree from `agent-context`
+(hidden groups included) and, in a throwaway --home:
 
 - runs every GET leaf and every read-only framework leaf live, with --agent;
 - runs every POST/PUT/PATCH/DELETE leaf with --dry-run, so nothing changes.
 
 It reports a non-zero exit, stdout that is not JSON (or JSON lines), unexpected stderr (only
-`hint:` lines, sync/tail progress events and the dry-run request echo are expected), and PUT/PATCH bodies
+`hint:` lines, sync/tail progress events and the dry-run request echo are expected),
+--agent rows cut to one field while --json rows carry more, and PUT/PATCH bodies
 carrying fields the run did not set.
 
 Sample arguments live in <cli-dir>/.sweep, one directive per line:
@@ -65,12 +66,58 @@ def leaves(node, path):
         yield from leaves(sub, path)
 
 
-def run(binary, args, home):
+def load_credentials(cli_dir, name):
+    """Load <cli-dir>/.env and export <NAME>_CONFIG=<cli-dir>/config.toml, as CLAUDE.md
+    describes, so a run never inherits another CLI's environment or the default instance."""
+    env_file = os.path.join(cli_dir, ".env")
+    config = os.path.join(cli_dir, "config.toml")
+    if not os.path.exists(env_file) and not os.path.exists(config):
+        templates = [t for t in ("config.toml.example", ".env.template")
+                     if os.path.exists(os.path.join(cli_dir, t))]
+        if templates:
+            sys.exit(f"{cli_dir}: no config.toml or .env; create one from {' or '.join(templates)}")
+        return
+    if os.path.exists(env_file):
+        with open(env_file) as f:
+            for line in f:
+                key, sep, value = line.strip().partition("=")
+                if sep and key and not key.startswith("#"):
+                    os.environ[key] = value
+    if os.path.exists(config):
+        os.environ[name.removesuffix("-pp-cli").upper() + "_CONFIG"] = config
+
+
+def run(binary, args, home, agent=True):
     proc = subprocess.run(
-        [binary, *args, "--agent", "--home", home],
+        [binary, *args, "--agent" if agent else "--json", "--home", home],
         capture_output=True, text=True, timeout=120,
     )
     return proc.returncode, proc.stdout, proc.stderr
+
+
+def rows(out):
+    """The result rows of a list response: a top-level array or the envelope's results."""
+    try:
+        doc = json.loads(out)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(doc, dict):
+        doc = doc.get("results")
+    if isinstance(doc, list) and doc and all(isinstance(r, dict) for r in doc):
+        return doc
+    return None
+
+
+def thin_agent_rows(binary, args, home, agent_out):
+    """--agent rows of one key or none while --json rows carry more: compaction dropped
+    what identifies the row (the {"type": ...} bug). Returns the --json key count, or 0."""
+    agent_rows = rows(agent_out)
+    if not agent_rows or max(len(r) for r in agent_rows) > 1:
+        return 0
+    rc, out, _ = run(binary, args, home, agent=False)
+    full = rows(out) if rc == 0 else None
+    keys = max(len(r) for r in full) if full else 0
+    return keys if keys > 1 else 0
 
 
 def resolve_var(binary, home, spec):
@@ -160,6 +207,7 @@ def main():
         sys.exit(__doc__)
     cli_dir = sys.argv[1].rstrip("/")
     name = os.path.basename(os.path.abspath(cli_dir))
+    load_credentials(cli_dir, name)
     subprocess.run(["make", "-s", "build"], cwd=cli_dir, check=True)
     binary = os.path.join(os.path.abspath(cli_dir), "bin", name)
     variables, runs, skips = load_directives(os.path.join(cli_dir, ".sweep"))
@@ -196,6 +244,10 @@ def main():
             continue
         if not is_json(out):
             problems.append(f"{label}: stdout is not JSON")
+        elif not dry_run:
+            keys = thin_agent_rows(binary, args, home, out)
+            if keys:
+                problems.append(f"{label}: --agent rows keep at most one field, --json rows carry {keys}")
         for line in unexpected_stderr(err, dry_run):
             problems.append(f"{label}: stderr: {line}")
         if method in ("PUT", "PATCH"):

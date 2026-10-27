@@ -11,7 +11,7 @@ in a throwaway --home:
 - runs every POST/PUT/PATCH/DELETE leaf with --dry-run, so nothing changes.
 
 It reports a non-zero exit, stdout that is not JSON (or JSON lines), unexpected stderr (only
-`hint:` lines and the dry-run request echo are expected), and PUT/PATCH bodies
+`hint:` lines, sync/tail progress events and the dry-run request echo are expected), and PUT/PATCH bodies
 carrying fields the run did not set.
 
 Sample arguments live in <cli-dir>/.sweep, one directive per line:
@@ -104,12 +104,36 @@ def unexpected_stderr(stderr, dry_run):
     noise = []
     for line in stderr.splitlines():
         s = line.strip()
-        if not s or s.startswith("hint:"):
+        if not s or s.startswith("hint:") or is_event(s):
             continue
         if dry_run and not (s.startswith("warning:") or s.startswith("Error")):
             continue  # the echoed request, headers and body
         noise.append(s)
     return noise
+
+
+# Progress events that report no problem. Newer prints send them to stderr under
+# --agent; warnings, anomalies, truncation and errors stay reported.
+PROGRESS_EVENTS = {
+    "sync_start", "sync_progress", "sync_complete", "sync_dryrun",
+    "page_fetch", "complete", "reconcile", "data", "output_metadata",
+}
+
+
+def is_event(line):
+    """A progress event that reports no problem (sync_summary only when clean)."""
+    try:
+        doc = json.loads(line)
+    except json.JSONDecodeError:
+        return False
+    event = doc.get("event") if isinstance(doc, dict) else None
+    if not isinstance(event, str):
+        return False
+    if event == "sync_summary":
+        return not doc.get("errored") and not doc.get("warned")
+    if event == "output_metadata":
+        return not (doc.get("meta") or {}).get("truncated")
+    return event in PROGRESS_EVENTS
 
 
 def is_json(out):

@@ -22,6 +22,7 @@ func newAdsCheckCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "check",
 		Short:       "Ask whether a search has new listings since a given listing urn (cheap, no listing data)",
+		Long:        "Ask whether a search has new listings since a given listing urn (cheap, no listing data).\n\nAlways reads live: the answer is true only now, so there is no offline fallback\nand --data-source local is refused.",
 		Example:     "  subito-pp-cli ads check --query iphone --last id:ad:550e8400-e29b-41d4-a716-446655440000:list:663298311",
 		Annotations: map[string]string{"pp:endpoint": "ads.check", "pp:method": "GET", "pp:path": "/search/items/check", "mcp:read-only": "true", "pp:requires-input": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,7 +71,7 @@ func newAdsCheckCmd(flags *rootFlags) *cobra.Command {
 			if flagLast != "" {
 				params["last"] = formatCLIParamValue(flagLast)
 			}
-			data, prov, err := resolveReadWithStrategyAndResponsePath(cmd.Context(), c, flags, "auto", "ads", false, path, params, nil, "", cmd.ErrOrStderr())
+			data, prov, err := resolveReadWithStrategyAndResponsePath(cmd.Context(), c, flags, "live", "ads", false, path, params, nil, "", cmd.ErrOrStderr())
 			if err != nil {
 				return classifyAPIError(cmd.OutOrStdout(), err, flags)
 			}

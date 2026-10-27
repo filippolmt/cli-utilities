@@ -18,10 +18,17 @@ Hand-written code goes in its own files beside them, named after the CLI —
 `internal/cli/fritzbox_*.go`, `internal/store/fritzbox_*.go` and
 `internal/config/fritzbox_config.go`.
 
+CI (`scripts/check_patches.py`) fails a PR that edits a generated file no
+record in `.printing-press-patches/` names; label a reprint PR `reprint`.
+
 Test a hand-written command by running it through `RootCmd()` against an
 `httptest` server; the generated `*_test.go` scaffolds only check `--help`.
-`changedetection-pp-cli/internal/cli/changedetection_watches_test.go`
-(`fakeInstance`, `runAgainst`) is the pattern.
+The pattern is `changedetection-pp-cli/internal/cli/changedetection_watches_test.go`
+(`fakeInstance`, `runAgainst`); in subito it is
+`subito-pp-cli/internal/cli/subito_patches_test.go` (`fakeHades`,
+`testenv.Isolate`): there `--home` is a process-wide override that leaks into
+later tests, and the store writes its warnings to `os.Stderr`, not the
+command's stderr.
 
 MCP: the typed tools in `internal/mcp/tools.go` call the API directly;
 `internal/mcp/cobratree` shells out to the CLI only for commands without a
@@ -35,9 +42,9 @@ values a field takes) are in the instance's OpenAPI:
 ## Done
 
 A change to a CLI is done when `python3 scripts/sweep.py <cli-dir>` reports
-nothing, with the credentials loaded. It runs every command live (writes as
-`--dry-run`); sample arguments go in `<cli-dir>/.sweep`, and a CLI without
-one starts by adding it.
+nothing. It loads the CLI's own credentials and runs every command live
+(writes as `--dry-run`); sample arguments go in `<cli-dir>/.sweep`, and a CLI
+without one starts by adding it.
 
 ## Credentials
 

@@ -30,7 +30,8 @@ The pattern is `changedetection-pp-cli/internal/cli/changedetection_watches_test
 later tests, and the store writes its warnings to `os.Stderr`, not the
 command's stderr. In fritzbox it is
 `fritzbox-pp-cli/internal/cli/fritzbox_patches_test.go` (`fakeQueryBox`,
-`runCapturingStderr`).
+`runCapturingStderr`), and for TR-064 `fritzbox_hosts_test.go` (`fakeBox`
+serves web and TR-064 on one port by setting `fritzbox.TR064Port`).
 
 MCP: the typed tools in `internal/mcp/tools.go` call the API directly;
 `internal/mcp/cobratree` shells out to the CLI only for commands without a

@@ -31,7 +31,8 @@ import (
 // flatten every one of them to exit 5, so an agent asked to fix its
 // credentials would instead be told the API broke. classifyAPIError already
 // short-circuits on an error that carries a typed code, so this only has to
-// add the transport-level throttle the generated classifier cannot see.
+// add what the generated classifier cannot see: the transport-level throttle
+// and TR-064's rejected digest credentials.
 func fbErr(err error) error {
 	if err == nil {
 		return nil
@@ -39,6 +40,9 @@ func fbErr(err error) error {
 	var throttle *fritzbox.ThrottleError
 	if errors.As(err, &throttle) {
 		return rateLimitErr(err)
+	}
+	if errors.Is(err, fritzbox.ErrTR064Credentials) {
+		return authErr(err)
 	}
 	return classifyAPIError(err, nil)
 }

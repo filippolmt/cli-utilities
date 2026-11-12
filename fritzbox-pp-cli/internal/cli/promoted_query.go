@@ -17,7 +17,7 @@ func newQueryPromotedCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "query",
 		Short:       "Run an arbitrary FRITZ!OS data-path expression and print the raw JSON result",
-		Long:        "Run an arbitrary FRITZ!OS data-path expression and print the raw JSON result",
+		Long:        "Run an arbitrary FRITZ!OS data-path expression and print the raw JSON result.\n\nAlways reads live: an arbitrary expression has no row identity to cache, so there is no offline fallback and --data-source local is refused.",
 		Example:     "  fritzbox-pp-cli query run --result 'wlan:settings/ssid' --agent",
 		Annotations: map[string]string{"pp:endpoint": "query.run", "pp:method": "GET", "pp:path": "/query.lua", "mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,7 +52,7 @@ func newQueryPromotedCmd(flags *rootFlags) *cobra.Command {
 			if flagResult != "" {
 				params["result"] = formatCLIParamValue(flagResult)
 			}
-			data, prov, err := resolveReadWithStrategyAndResponsePath(cmd.Context(), c, flags, "auto", "query", false, path, params, nil, "", cmd.ErrOrStderr())
+			data, prov, err := resolveReadWithStrategyAndResponsePath(cmd.Context(), c, flags, "live", "query", false, path, params, nil, "", cmd.ErrOrStderr())
 			if err != nil {
 				return classifyAPIError(err, flags)
 			}

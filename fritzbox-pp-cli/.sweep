@@ -1,0 +1,66 @@
+# Sample arguments for scripts/sweep.py (see its docstring).
+#
+# Commands that change the router are skipped, not run with --dry-run: their
+# dry run is hand-written, and a regression in it would reboot the box or
+# drop its wireless in the middle of a sweep.
+
+var host = hosts list --online | .results[0].mac
+
+run actions search = GetHostListPath
+run auth status =
+run device keylock =
+run device led =
+run doctor =
+run hosts get = {host}
+run log search = WLAN
+run phonebook lookup = a
+run presence =
+run query = --result wlan:settings/ssid
+run recall = guest network
+run search = guest --data-source local
+run snapshot =
+run sync =
+run tr064 actions = Hosts1
+run tr064 call = DeviceInfo1 GetInfo
+run tr064 describe = Hosts1 X_AVM-DE_GetHostListPath
+run web page = dnsSrv
+
+skip aha call = takes any AHA command, writes included; home devices covers the read path
+skip auth login = mints and stores a session; every live command covers the login
+skip auth logout = ends the stored session
+skip auth set-token = stores a credential
+skip auth setup = interactive
+skip device backup = exports the configuration, secrets included
+skip device reboot = changes the router
+skip home color = changes the router; also needs a smart-home device, none on the sweep box
+skip home level = changes the router; also needs a smart-home device, none on the sweep box
+skip home power = needs a smart-home device, none on the sweep box
+skip home stats = needs a smart-home device, none on the sweep box
+skip home switch = changes the router; also needs a smart-home device, none on the sweep box
+skip home thermostat = changes the router; also needs a smart-home device, none on the sweep box
+skip hosts block = changes the router
+skip hosts cleanup = changes the router
+skip hosts set-profile = changes the router
+skip hosts unblock = changes the router
+skip portmap add = changes the router
+skip portmap delete = changes the router
+skip tam off = changes the router
+skip tam on = changes the router
+skip wan reconnect = changes the router
+skip wifi off = changes the router
+skip wifi on = changes the router
+skip learnings confirm = local learning state, not the API
+skip learnings forget = local learning state, not the API
+skip learnings purge = local learning state, not the API
+skip learnings reject = local learning state, not the API
+skip playbook amend = local learning state, not the API
+skip teach = local learning state, not the API
+skip teach-lookup = local learning state, not the API
+skip teach-pattern = local learning state, not the API
+skip teach-playbook = local learning state, not the API
+skip profile delete = local profile state, not the API
+skip profile save = local profile state, not the API
+skip profile show = local profile state, not the API
+skip profile use = local profile state, not the API
+skip version = prints plain text by design
+skip workflow archive = same as sync

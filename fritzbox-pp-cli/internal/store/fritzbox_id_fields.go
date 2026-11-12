@@ -13,4 +13,7 @@ package store
 // regeneration cannot drop it.
 func init() {
 	resourceIDFieldOverrides["hosts"] = "UID"
+	// wlan is one object, the primary network; its SSID is the only field that
+	// names it. Without this every `wlan` call warned that nothing was cached.
+	resourceIDFieldOverrides["wlan"] = "ssid"
 }

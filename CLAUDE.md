@@ -28,7 +28,9 @@ The pattern is `changedetection-pp-cli/internal/cli/changedetection_watches_test
 `subito-pp-cli/internal/cli/subito_patches_test.go` (`fakeHades`,
 `testenv.Isolate`): there `--home` is a process-wide override that leaks into
 later tests, and the store writes its warnings to `os.Stderr`, not the
-command's stderr.
+command's stderr. In fritzbox it is
+`fritzbox-pp-cli/internal/cli/fritzbox_patches_test.go` (`fakeQueryBox`,
+`runCapturingStderr`).
 
 MCP: the typed tools in `internal/mcp/tools.go` call the API directly;
 `internal/mcp/cobratree` shells out to the CLI only for commands without a
@@ -43,8 +45,10 @@ values a field takes) are in the instance's OpenAPI:
 
 A change to a CLI is done when `python3 scripts/sweep.py <cli-dir>` reports
 nothing. It loads the CLI's own credentials and runs every command live
-(writes as `--dry-run`); sample arguments go in `<cli-dir>/.sweep`, and a CLI
-without one starts by adding it.
+(generated writes as `--dry-run`); sample arguments go in `<cli-dir>/.sweep`,
+and a CLI without one starts by adding it. A `run` line executes live with no
+`--dry-run`, so a hand-written command that changes the instance gets a
+`skip` line.
 
 ## Credentials
 
@@ -55,4 +59,8 @@ Each CLI keeps its credentials in its own directory, in gitignored
 (`CHANGEDETECTION_CONFIG`, `FRITZBOX_CONFIG`, `SUBITO_CONFIG`); otherwise it
 falls back to `~/.config/<cli>/`. Env vars override the config file. The
 CLIs read the environment, not `.env`, so load it first:
-`set -a; . ./.env; set +a` (lines must be `KEY=value`).
+`set -a; . ./.env; set +a` (lines must be `KEY=value`). A new worktree gets
+both files from `.worktreeinclude`.
+
+Each wrong FRITZ!Box password lengthens the router's login block. To make only
+TR-064 fail, export a valid `FRITZBOX_SID` with a wrong `FRITZBOX_PASSWORD`.

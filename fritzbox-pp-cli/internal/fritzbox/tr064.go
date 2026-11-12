@@ -21,6 +21,10 @@ import (
 // A var only so tests can point TR-064 at an httptest server.
 var TR064Port = 49000
 
+// ErrTR064Credentials is the router refusing the digest credentials, so the
+// CLI can report it as an auth failure rather than a broken API.
+var ErrTR064Credentials = errors.New("router rejected the TR-064 credentials; check FRITZBOX_USERNAME and FRITZBOX_PASSWORD, and confirm TR-064 is enabled under Home Network, Network Settings, Allow access for applications")
+
 // maxTR064Body caps a single SOAP response read. Service descriptors are the
 // largest documents involved and stay well under a megabyte.
 const maxTR064Body = 8 << 20
@@ -357,7 +361,7 @@ func (c *TR064) do(ctx context.Context, method, path, soapAction string, body []
 		return tr064Reply{}, nil, err
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		return tr064Reply{}, nil, fmt.Errorf("router rejected the TR-064 credentials; check FRITZBOX_USERNAME and FRITZBOX_PASSWORD, and confirm TR-064 is enabled under Home Network, Network Settings, Allow access for applications")
+		return tr064Reply{}, nil, ErrTR064Credentials
 	}
 	return resp, raw, nil
 }

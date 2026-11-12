@@ -1,0 +1,4 @@
+# Gitignored files `wt step copy-ignored --require-include` copies into a new
+# worktree: each CLI's credentials, which scripts/sweep.py needs.
+/*-pp-cli/config.toml
+/*-pp-cli/.env

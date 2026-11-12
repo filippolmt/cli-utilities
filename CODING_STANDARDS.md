@@ -29,3 +29,7 @@ here.
   carries the row's id, its human name and the value the command exists for
   (a listing's price, a filter's query-string key). The sweep catches rows cut
   to one field; the reviewer judges the rows that keep two useless ones.
+- **A filter fails when its source does.** A command that filters on data
+  from a secondary read (a second endpoint, a fallback) returns an error when
+  that read fails: an empty result with exit 0 reads as "nothing matches".
+  Unfiltered output may degrade, with a warning on stderr.

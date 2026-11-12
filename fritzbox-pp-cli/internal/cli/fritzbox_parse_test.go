@@ -162,3 +162,21 @@ func TestParseUnusedHosts(t *testing.T) {
 		t.Errorf("gone = %+v", gone)
 	}
 }
+
+func TestApplyHostMediaFromTR064HostList(t *testing.T) {
+	hosts := []fbHost{{MAC: "40:bd:32:cb:7b:4f"}, {MAC: "00:11:32:5E:E6:74"}, {MAC: "A8:E6:21:2A:A7:33"}, {MAC: "11:22:33:44:55:66"}}
+	raw := `<?xml version="1.0" encoding="UTF-8"?> <List>
+<Item><MACAddress>40:BD:32:CB:7B:4F</MACAddress><InterfaceType>Ethernet</InterfaceType><X_AVM-DE_Port>4</X_AVM-DE_Port><X_AVM-DE_Guest>1</X_AVM-DE_Guest></Item>
+<Item><MACAddress>00:11:32:5E:E6:74</MACAddress><InterfaceType>Ethernet</InterfaceType><X_AVM-DE_Guest>0</X_AVM-DE_Guest></Item>
+<Item><MACAddress>A8:E6:21:2A:A7:33</MACAddress><InterfaceType>802.11</InterfaceType><X_AVM-DE_Guest>0</X_AVM-DE_Guest></Item>
+</List>`
+	if err := applyHostMedia(hosts, []byte(raw)); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"guest", "ethernet", "wifi", "unknown"}
+	for i, h := range hosts {
+		if h.Medium() != want[i] {
+			t.Errorf("host %s medium = %q, want %q", h.MAC, h.Medium(), want[i])
+		}
+	}
+}

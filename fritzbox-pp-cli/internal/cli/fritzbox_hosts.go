@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -17,7 +18,9 @@ import (
 
 // hostListExpr is the data-path expression that returns every device the router
 // knows, online and offline. The field list is fixed here rather than exposed,
-// because every consumer in this package depends on these names.
+// because every consumer in this package depends on these names. guest,
+// ethernet and wlan come back empty on FRITZ!OS 8; HostsWithMedium reads the
+// medium from TR-064 instead and keeps these as the fallback for older firmware.
 const hostListExpr = "landevice:settings/landevice/list(name,ip,mac,active,UID,guest,ethernet,wlan)"
 
 // fbHost is one device known to the router.
@@ -30,6 +33,9 @@ type fbHost struct {
 	Guest    string `json:"guest"`
 	Ethernet string `json:"ethernet"`
 	WLAN     string `json:"wlan"`
+
+	// medium is set from the TR-064 host list and wins over the fields above.
+	medium string
 }
 
 // Online reports whether the router currently sees the device.
@@ -37,6 +43,9 @@ func (h fbHost) Online() bool { return h.Active == "1" }
 
 // Medium reports how the device is attached.
 func (h fbHost) Medium() string {
+	if h.medium != "" {
+		return h.medium
+	}
 	switch {
 	case h.Guest == "1":
 		return "guest"
@@ -56,7 +65,9 @@ func (h fbHost) row() map[string]any {
 	}
 }
 
-// Hosts returns every device the router knows about.
+// Hosts returns every device the router knows about. The medium is only as
+// good as the data path's own fields; callers that show or filter on it use
+// HostsWithMedium.
 func (b *fbBox) Hosts(ctx context.Context) ([]fbHost, error) {
 	res, err := b.web.Query(ctx, map[string]string{"hosts": hostListExpr})
 	if err != nil {
@@ -78,6 +89,82 @@ func (b *fbBox) Hosts(ctx context.Context) ([]fbHost, error) {
 		return strings.ToLower(hosts[i].Name) < strings.ToLower(hosts[j].Name)
 	})
 	return hosts, nil
+}
+
+// HostsWithMedium is Hosts with each medium read from the TR-064 host list.
+// When required, a failed TR-064 read is an error, because a medium filter
+// would otherwise answer from the empty fallback and look like "no devices";
+// when not, it is a warning and the fallback medium stands.
+func (b *fbBox) HostsWithMedium(ctx context.Context, required bool) ([]fbHost, error) {
+	hosts, err := b.Hosts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := b.fillHostMedia(ctx, hosts); err != nil {
+		if required {
+			return nil, err
+		}
+		fmt.Fprintf(os.Stderr, "warning: connection medium unavailable from TR-064, it may read unknown: %v\n", err)
+	}
+	return hosts, nil
+}
+
+// fillHostMedia sets each host's medium from the TR-064 host list, which
+// carries the guest flag and the interface type per MAC address.
+func (b *fbBox) fillHostMedia(ctx context.Context, hosts []fbHost) error {
+	out, err := b.Call(ctx, "Hosts1", "X_AVM-DE_GetHostListPath", nil)
+	if err != nil {
+		return err
+	}
+	path := out["X_AVM-DE_HostListPath"]
+	if path == "" {
+		return apiErr(fmt.Errorf("router returned no TR-064 host list path"))
+	}
+	// The router answers with a path on the TR-064 port, not a full URL.
+	body, err := b.web.Fetch(ctx, b.tr.Origin()+path)
+	if err != nil {
+		return fbErr(err)
+	}
+	return applyHostMedia(hosts, body)
+}
+
+// applyHostMedia copies the medium from a devicehostlist.lua document onto
+// hosts, matching any of an entry's MAC addresses case-insensitively. An entry
+// whose interface type is neither Ethernet nor 802.11 (an offline host reports
+// none) leaves the host's fallback medium in place.
+func applyHostMedia(hosts []fbHost, raw []byte) error {
+	var doc struct {
+		Items []struct {
+			MAC       string `xml:"MACAddress"`
+			MACList   string `xml:"X_AVM-DE_MACAddressList"`
+			Interface string `xml:"InterfaceType"`
+			Guest     string `xml:"X_AVM-DE_Guest"`
+		} `xml:"Item"`
+	}
+	if err := xml.Unmarshal(raw, &doc); err != nil {
+		return apiErr(fmt.Errorf("parsing the TR-064 host list: %w", err))
+	}
+	byMAC := make(map[string][]int, len(hosts))
+	for i, h := range hosts {
+		if mac := strings.ToUpper(strings.TrimSpace(h.MAC)); mac != "" {
+			byMAC[mac] = append(byMAC[mac], i)
+		}
+	}
+	for _, it := range doc.Items {
+		medium := "guest"
+		if it.Guest != "1" {
+			medium = map[string]string{"Ethernet": "ethernet", "802.11": "wifi"}[it.Interface]
+		}
+		if medium == "" {
+			continue
+		}
+		for _, mac := range strings.Split(it.MAC+","+it.MACList, ",") {
+			for _, i := range byMAC[strings.ToUpper(strings.TrimSpace(mac))] {
+				hosts[i].medium = medium
+			}
+		}
+	}
+	return nil
 }
 
 // findHost resolves a device by MAC, IP, or a case-insensitive name substring.
@@ -151,7 +238,7 @@ func newHostsGetCmd(flags *rootFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			hosts, err := box.Hosts(ctx)
+			hosts, err := box.HostsWithMedium(ctx, false)
 			if err != nil {
 				return err
 			}

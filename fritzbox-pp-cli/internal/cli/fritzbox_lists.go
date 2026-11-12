@@ -58,7 +58,8 @@ ask for just a total with --count.`,
 			if err != nil {
 				return err
 			}
-			hosts, err := box.Hosts(ctx)
+			m := strings.ToLower(medium)
+			hosts, err := box.HostsWithMedium(ctx, m != "" && m != "all")
 			if err != nil {
 				return err
 			}
@@ -68,7 +69,7 @@ ask for just a total with --count.`,
 				if onlineOnly && !h.Online() {
 					continue
 				}
-				if m := strings.ToLower(medium); m != "" && m != "all" && h.Medium() != m {
+				if m != "" && m != "all" && h.Medium() != m {
 					continue
 				}
 				if h.Online() {

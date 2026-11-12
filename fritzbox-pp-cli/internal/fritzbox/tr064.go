@@ -18,7 +18,8 @@ import (
 )
 
 // TR064Port is the fixed port FRITZ!OS serves the TR-064 control interface on.
-const TR064Port = 49000
+// A var only so tests can point TR-064 at an httptest server.
+var TR064Port = 49000
 
 // maxTR064Body caps a single SOAP response read. Service descriptors are the
 // largest documents involved and stay well under a megabyte.
@@ -126,6 +127,9 @@ type TR064 struct {
 func NewTR064(base, username, password string, hc *http.Client, limiter *cliutil.AdaptiveLimiter) *TR064 {
 	return &TR064{base: tr064Origin(base), username: username, password: password, hc: hc, limiter: limiter}
 }
+
+// Origin is the TR-064 control origin; some actions return a path relative to it.
+func (c *TR064) Origin() string { return c.base }
 
 // tr064Origin rewrites a router origin onto the TR-064 control port.
 func tr064Origin(base string) string {
